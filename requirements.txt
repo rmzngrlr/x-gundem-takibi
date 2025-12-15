@@ -1,0 +1,11 @@
+streamlit
+undetected-chromedriver
+selenium
+requests
+deep-translator
+transformers
+torch
+sentencepiece
+protobuf
+sentence-transformers
+scikit-learn
