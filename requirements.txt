@@ -1,9 +1,0 @@
-streamlit
-undetected-chromedriver
-selenium
-requests
-deep-translator
-transformers
-torch
-sentencepiece
-protobuf
