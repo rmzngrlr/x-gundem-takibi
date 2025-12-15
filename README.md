@@ -1,4 +1,4 @@
-# 🧠 X Gündem Takibi v2 (AI Agenda Analyst)
+# 🧠 X Gündem Takibi (AI Agenda Analyst)
 
 **X Gündem Takibi**, belirlediğiniz Twitter (X) hesaplarını veya **Twitter Listelerini** anlık olarak izleyen, paylaşımları kelime bazlı değil **anlam bazlı (semantik)** analiz eden ve yapay zeka ile özetleyerek size raporlayan gelişmiş bir istihbarat aracıdır.
 
@@ -56,4 +56,5 @@ torch
 sentencepiece
 protobuf
 sentence-transformers
+
 scikit-learn
