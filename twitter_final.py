@@ -358,25 +358,44 @@ def metin_on_isleme(metin):
 def tweet_yakala(driver, limit=1):
     veriler = []
     try:
+        # Sayfanın yüklenmesini bekle (tweetlerin gelmesi için)
+        try:
+            WebDriverWait(driver, 10).until(
+                lambda d: d.find_elements(By.CSS_SELECTOR, 'div[data-testid="cellInnerDiv"]') or
+                          d.find_elements(By.TAG_NAME, "article")
+            )
+        except:
+            # Tweet bulunamadıysa veya zaman aşımı olduysa
+            return []
+
         # Scroll işlemleri (İnsan taklidi için random sleep)
-        for _ in range(4): 
-            driver.execute_script("window.scrollBy(0, 1500);")
-            time.sleep(random.uniform(0.7, 1.5)) 
+        # Daha fazla tweet yüklenmesi için biraz daha fazla scroll
+        for _ in range(3):
+            driver.execute_script("window.scrollBy(0, 1000);")
+            time.sleep(random.uniform(1.5, 2.5))
+
         articles = driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="cellInnerDiv"]')
         if not articles: articles = driver.find_elements(By.TAG_NAME, "article")
+
         for article in articles:
             if len(veriler) >= limit: break
             try:
                 tweet_text = article.find_element(By.CSS_SELECTOR, 'div[data-testid="tweetText"]').text
                 try:
-                    lnk = article.find_element(By.TAG_NAME, "time").find_element(By.XPATH, "..").get_attribute("href")
+                    # Link alma işlemi bazen time elementinden yapılamayabilir, alternatif eklenebilir
+                    time_element = article.find_element(By.TAG_NAME, "time")
+                    lnk = time_element.find_element(By.XPATH, "..").get_attribute("href")
                 except: lnk = "link_yok"
-                own = lnk.split("/")[3] if "/" in lnk else "bilinmeyen"
+
+                own = lnk.split("/")[3] if "/" in lnk and len(lnk.split("/")) > 3 else "bilinmeyen"
                 
                 if not cop_tweet_kontrol(tweet_text):
                     veriler.append({"hesap": own, "metin": tweet_text, "link": lnk})
             except: continue
-    except: pass
+    except Exception as e:
+        # Hata ayıklama için (Geliştirme aşamasında st.write ile gösterilebilir ama akışı bozmayalım)
+        # print(f"Hata: {e}")
+        pass
     return veriler
 
 def haber_metni_olustur_groq(grup):
@@ -593,13 +612,20 @@ if st.session_state.is_running:
         for acc in accs:
             status.write(f"🔍 @{acc} taranıyor...")
             driver.get(f"https://x.com/{acc}")
-            time.sleep(1.5)
-            toplanan.extend(tweet_yakala(driver, limit=10))
+            # Profil yüklenmesini bekle (tweet_yakala içinde de kontrol var ama burada da kısa bir bekleme iyidir)
+            time.sleep(3)
+            veriler = tweet_yakala(driver, limit=10)
+            if not veriler:
+                status.write(f"⚠️ @{acc} için tweet bulunamadı.")
+            toplanan.extend(veriler)
     else:
         status.write(f"🔗 Liste taranıyor...")
         driver.get(hedef_veri)
-        time.sleep(2)
-        toplanan.extend(tweet_yakala(driver, limit=25))
+        time.sleep(4)
+        veriler = tweet_yakala(driver, limit=25)
+        if not veriler:
+            status.write(f"⚠️ Liste içeriği alınamadı.")
+        toplanan.extend(veriler)
     
     # Yeni Tweetleri Havuza Ekle (Mükerrer Kontrolü ile)
     for t in toplanan:
