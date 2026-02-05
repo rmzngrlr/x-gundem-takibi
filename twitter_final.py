@@ -310,7 +310,11 @@ def tarayiciyi_baslat():
                     match = re.search(r"Current browser version is\s+(\d+)", str(e))
                     if match:
                         main_version = int(match.group(1))
-                        driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
+                        # Options nesnesini yeniden oluştur
+                        new_options = uc.ChromeOptions()
+                        new_options.add_argument("--start-maximized")
+                        new_options.add_argument("--disable-notifications")
+                        driver = uc.Chrome(options=new_options, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
                         st.session_state.driver = driver
                         return driver
                 except Exception as e2:
