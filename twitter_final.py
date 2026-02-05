@@ -326,10 +326,24 @@ def tarayiciyi_baslat():
 
 def oturum_kontrol(driver):
     try:
-        driver.get("https://x.com/home")
-        time.sleep(4)
-        driver.find_element(By.CSS_SELECTOR, "a[data-testid='AppTabBar_Home_Link']")
-        return True
+        # Eğer zaten x.com üzerindeysek tekrar gitme (gereksiz refresh'i önle)
+        if "x.com" not in driver.current_url:
+            driver.get("https://x.com/home")
+
+        # Bekleme süresini ve yöntemini iyileştir
+        try:
+            WebDriverWait(driver, 10).until(
+                lambda d: d.find_element(By.CSS_SELECTOR, "a[data-testid='AppTabBar_Home_Link']") or
+                          d.find_element(By.CSS_SELECTOR, "div[data-testid='primaryColumn']")
+            )
+            return True
+        except:
+            # Belki yüklenmemiştir, bir şans daha verip refresh atalım
+            driver.get("https://x.com/home")
+            WebDriverWait(driver, 15).until(
+                lambda d: d.find_element(By.CSS_SELECTOR, "a[data-testid='AppTabBar_Home_Link']")
+            )
+            return True
     except: return False
 
 def cop_tweet_kontrol(metin):
