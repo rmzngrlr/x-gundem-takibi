@@ -1,0 +1,21 @@
+{
+  "rules": {
+    "tenants": {
+      ".read": true,
+      "$tenant_id": {
+        ".write": "auth != null && auth.uid == $tenant_id"
+      }
+    },
+    "calisanlar": {
+      ".read": true,
+      ".indexOn": ["tenant_id"],
+      "$username": {
+        ".write": "auth != null"
+      }
+    },
+    "abone_bekleyenler": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

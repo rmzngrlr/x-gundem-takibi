@@ -1,0 +1,8 @@
+streamlit
+undetected-chromedriver
+selenium
+requests
+firebase-admin
+groq
+scikit-learn
+pandas
