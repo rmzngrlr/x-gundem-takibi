@@ -443,27 +443,38 @@
         }
 
         function saveTokenToDatabase(token) {
-            const db = getDatabase(app);
-            const tid = localStorage.getItem('tenant_id');
-            
-            // Sadece Tenant ID varsa kaydet
-            if (tid) {
-                set(ref(db, 'abone_bekleyenler/' + token), {
-                    tarih: new Date().toISOString(),
-                    platform: navigator.platform,
-                    userAgent: navigator.userAgent,
-                    tenant_id: tid
-                });
-            } else {
-                console.log("Token alındı ancak Tenant ID yok. Kayıt ertelendi.");
+            try {
+                const db = getDatabase(app);
+                const tid = localStorage.getItem('tenant_id');
+
+                // Sadece Tenant ID varsa kaydet
+                if (tid) {
+                    set(ref(db, 'abone_bekleyenler/' + token), {
+                        tarih: new Date().toISOString(),
+                        platform: navigator.platform,
+                        userAgent: navigator.userAgent,
+                        tenant_id: tid
+                    }).catch(error => {
+                        console.error("Token veritabanına kaydedilemedi:", error);
+                    });
+                } else {
+                    console.log("Token alındı ancak Tenant ID yok. Kayıt ertelendi.");
+                }
+            } catch(e) {
+                console.error("saveTokenToDatabase hatası:", e);
             }
         }
 
         // Bildirim Yakalama
         onMessage(messaging, (payload) => {
-            const title = payload.notification?.title || payload.data?.haber_baslik || payload.data?.title || "X Gündem Raporu";
-            const body = payload.notification?.body || payload.data?.haber_ozet || payload.data?.body || "Yeni gelişme.";
-            new Notification(title, { body: body, icon: '/ikon.png' });
+            console.log("Ön plan bildirimi alındı:", payload);
+            try {
+                const title = payload.notification?.title || payload.data?.haber_baslik || payload.data?.title || "X Gündem Raporu";
+                const body = payload.notification?.body || payload.data?.haber_ozet || payload.data?.body || "Yeni gelişme.";
+                new Notification(title, { body: body, icon: '/ikon.png' });
+            } catch (e) {
+                console.error("Ön plan bildirimi gösterilemedi:", e);
+            }
         });
 
         // --- AKIŞ ---

@@ -121,14 +121,11 @@ def bekleyen_aboneleri_isle(tid):
         snapshot = ref_bekleyen.get()
         
         if snapshot:
-            tokens_to_sub = []
-            keys_to_del = []
-            
             tokens_std = []
             tokens_ios = []
-            keys_to_del = []
+            tokens_map = {} # token -> key (firebase db key)
             
-            for token, info in snapshot.items():
+            for key, info in snapshot.items():
                 # Eğer kayıtlı tenant_id bizimkisi ise
                 if info.get('tenant_id') == tid:
                     # Platform kontrolü (iOS vs Diğerleri)
@@ -140,45 +137,53 @@ def bekleyen_aboneleri_isle(tid):
                         is_ios = True
                     elif re.search(r'iPhone|iPad|iPod', platform, re.IGNORECASE):
                         is_ios = True
-                    # iPad on Desktop Mode Check (MacIntel + Touch) - UserAgent genelde Macintosh olur ama ayırt etmek zor.
-                    # Şimdilik standart iOS user agent kontrolü yeterli.
                     
+                    # Key'de nokta olamayacağı için token kaydedilirken manipüle edilmiş olabilir
+                    # Ancak burada key doğrudan token olarak kullanılıyor
+                    real_token = key
+                    tokens_map[real_token] = key
+
                     if is_ios:
-                        tokens_ios.append(token)
+                        tokens_ios.append(real_token)
                     else:
-                        tokens_std.append(token)
-                        
-                    keys_to_del.append(token)
+                        tokens_std.append(real_token)
             
             topic_std = f'gundem_std_{tid}'
             topic_ios = f'gundem_ios_{tid}'
 
-            if tokens_std:
-                # Standart Topic'e abone yap, iOS Topic'ten çıkar (Göç durumu için)
-                try:
-                    messaging.subscribe_to_topic(tokens_std, topic_std)
-                    messaging.unsubscribe_from_topic(tokens_std, topic_ios)
-                except: pass
+            processed_keys = set()
 
-            if tokens_ios:
-                # iOS Topic'e abone yap, Standart Topic'ten çıkar
+            def process_subs(tokens, topic_to_sub, topic_to_unsub):
+                if not tokens: return
                 try:
-                    messaging.subscribe_to_topic(tokens_ios, topic_ios)
-                    messaging.unsubscribe_from_topic(tokens_ios, topic_std)
-                except: pass
-                
-            # İşlenenleri Sil
-            if keys_to_del:
-                for k in keys_to_del:
-                    try: db.reference(f'abone_bekleyenler/{k}').delete()
+                    # Subscribe
+                    # Not: subscribe_to_topic hata vermez, response döner (ağ hatası hariç)
+                    resp_sub = messaging.subscribe_to_topic(tokens, topic_to_sub)
+                    if resp_sub.failure_count > 0:
+                        st.warning(f"Abone hatası ({topic_to_sub}): {resp_sub.failure_count} başarısız.")
+                        # Sadece başarılı olanlar ve 'invalid' hatası alanlar silinmeli (tekrar denememek için)
+                        # Şimdilik hepsini 'processed' sayıyoruz.
+
+                    for t in tokens:
+                        processed_keys.add(tokens_map[t])
+
+                    try: messaging.unsubscribe_from_topic(tokens, topic_to_unsub)
                     except: pass
                     
-                # Log (Opsiyonel)
-                # print(f"{len(tokens_to_sub)} yeni cihaz abone yapıldı.")
+                except Exception as e:
+                    st.error(f"Abonelik işlem hatası ({topic_to_sub}): {e}")
+
+            process_subs(tokens_std, topic_std, topic_ios)
+            process_subs(tokens_ios, topic_ios, topic_std)
+
+            # İşlenenleri Sil
+            if processed_keys:
+                for k in processed_keys:
+                    try: db.reference(f'abone_bekleyenler/{k}').delete()
+                    except Exception as e: st.error(f"DB Silme Hatası: {e}")
                 
     except Exception as e:
-        # Hata durumunda sessiz kal veya logla
-        pass
+        st.error(f"Bekleyen aboneler işlenirken genel hata: {e}")
 
 # Geçmişi Yükle (Sadece bir kere)
 if st.session_state.tenant_id and not st.session_state.db_history_loaded:
@@ -268,25 +273,37 @@ def firebase_bildirim_gonder(ozet, kaynaklar_html, kategori="Gündem", baslik_on
     }
     try: 
         db.reference(f'tenants/{tid}/gundem').push().set(veri)
-    except: pass
+    except Exception as e:
+        st.error(f"DB Kayıt Hatası: {e}")
 
     try:
         topic_std = f'gundem_std_{tid}'
         topic_ios = f'gundem_ios_{tid}'
         
-        messaging.send(messaging.Message(
-            data={"haber_baslik": tam_baslik, "haber_ozet": ozet, "title": tam_baslik, "body": ozet, "click_action": PWA_URL, "url": PWA_URL},
-            android=messaging.AndroidConfig(priority="high", ttl=3600),
-            webpush=messaging.WebpushConfig(headers={"Urgency": "high"}),
-            topic=topic_std
-        ))
-        messaging.send(messaging.Message(
-            notification=messaging.Notification(title=tam_baslik, body=ozet),
-            data={"haber_baslik": tam_baslik, "haber_ozet": ozet, "prevent_duplicate": "true", "url": PWA_URL},
-            topic=topic_ios,
-            webpush=messaging.WebpushConfig(headers={"Urgency": "high"})
-        ))
-    except: pass
+        # Android / Web
+        try:
+            messaging.send(messaging.Message(
+                data={"haber_baslik": tam_baslik, "haber_ozet": ozet, "title": tam_baslik, "body": ozet, "click_action": PWA_URL, "url": PWA_URL},
+                android=messaging.AndroidConfig(priority="high", ttl=3600),
+                webpush=messaging.WebpushConfig(headers={"Urgency": "high"}),
+                topic=topic_std
+            ))
+        except Exception as e:
+            st.warning(f"Bildirim Hatası (STD): {e}")
+
+        # iOS
+        try:
+            messaging.send(messaging.Message(
+                notification=messaging.Notification(title=tam_baslik, body=ozet),
+                data={"haber_baslik": tam_baslik, "haber_ozet": ozet, "prevent_duplicate": "true", "url": PWA_URL},
+                topic=topic_ios,
+                webpush=messaging.WebpushConfig(headers={"Urgency": "high"})
+            ))
+        except Exception as e:
+             st.warning(f"Bildirim Hatası (iOS): {e}")
+
+    except Exception as e:
+        st.error(f"Bildirim Gönderim Genel Hatası: {e}")
 
 # Chrome temizle fonksiyonu KALDIRILDI (Multi-tenant çakışması için)
 
