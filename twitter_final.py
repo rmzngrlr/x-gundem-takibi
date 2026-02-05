@@ -304,7 +304,20 @@ def tarayiciyi_baslat():
             driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True)
             st.session_state.driver = driver
             return driver
-        except Exception as e: st.error(f"Tarayıcı hatası: {e}"); st.stop()
+        except Exception as e:
+            if "This version of ChromeDriver only supports Chrome version" in str(e):
+                try:
+                    match = re.search(r"Current browser version is\s+(\d+)", str(e))
+                    if match:
+                        main_version = int(match.group(1))
+                        driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
+                        st.session_state.driver = driver
+                        return driver
+                except Exception as e2:
+                    st.error(f"Tarayıcı başlatılamadı (Sürüm düzeltme başarısız): {e2}")
+                    st.stop()
+
+            st.error(f"Tarayıcı hatası: {e}"); st.stop()
     return st.session_state.driver
 
 def oturum_kontrol(driver):
