@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Kurumsal Giriş</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0E1117; color: #FFF; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .box { background: #262730; padding: 40px; border-radius: 10px; text-align: center; width: 300px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: none; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; background: #1d9bf0; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        .error { color: #f4212e; margin-top: 10px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>🚀 Kurumsal Panel</h2>
+        <form method="POST">
+            <input type="text" name="tenant_id" placeholder="Kurum Adı" required>
+            <input type="password" name="password" placeholder="Şifre" required>
+            <button type="submit">Giriş Yap</button>
+            {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        </form>
+    </div>
+</body>
+</html>

@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>X Gündem Raporu</title>
-    <link rel="icon" type="image/png" href="ikon.png">
-    <link rel="apple-touch-icon" href="apple-ikon.png">
-    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="/static/ikon.png">
+    <link rel="apple-touch-icon" href="/static/apple-ikon.png">
+    <link rel="manifest" href="/static/manifest.json">
     <style>
         /* Varsayılan Olarak Dark Mode (Streamlit Dark + Blue Accent) */
         :root { 
@@ -246,7 +246,7 @@
     <!-- LOGIN OVERLAY -->
     <div id="login-overlay" class="login-overlay">
         <div class="login-box">
-            <img src="ikon.png" style="width:50px; margin-bottom:15px; border-radius:8px;">
+            <img src="/static/ikon.png" style="width:50px; margin-bottom:15px; border-radius:8px;">
             <h2 style="margin:0 0 20px 0; font-size:18px;">Kurumsal Giriş</h2>
             <input type="text" id="username" placeholder="Kullanıcı Adı">
             <input type="password" id="password" placeholder="Şifre">
@@ -256,7 +256,7 @@
     </div>
 
     <div class="header">
-        <img src="ikon.png" class="app-logo" alt="logo">
+        <img src="/static/ikon.png" class="app-logo" alt="logo">
         <h1 id="page-title">X Gündem Raporu</h1>
         <button id="notify-btn" class="notify-btn" style="display:none;">Bildirimleri Aç</button>
         
@@ -328,61 +328,41 @@
         }
     </script>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-        import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js";
-        import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyAgIWcLB_yOas3gQ8g5GrJJcala5SGovEU",
-            authDomain: "x-gundem-raporu.firebaseapp.com",
-            databaseURL: "https://x-gundem-raporu-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "x-gundem-raporu",
-            storageBucket: "x-gundem-raporu.firebasestorage.app",
-            messagingSenderId: "904189656566",
-            appId: "1:904189656566:web:a2ada82d829c2a775a5bd7",
-            measurementId: "G-EPBRMV0RC6"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const messaging = getMessaging(app);
-        const db = getDatabase(app);
-
+    <script>
         let currentUserUID = localStorage.getItem('tenant_id');
 
         // --- AUTH LOGIC ---
-        window.login = function() {
+        window.login = async function() {
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
             const errDiv = document.getElementById('login-error');
             
-            get(child(ref(db), `calisanlar/${user}`)).then((snapshot) => {
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
-                    if (data.sifre == pass) {
-                        currentUserUID = data.tenant_id;
-                        localStorage.setItem('tenant_id', currentUserUID);
-                        document.getElementById('login-overlay').style.display = 'none';
-                        
-                        // Bildirim sürecini yeniden tetikle (Token'a Tenant ID eklemek için)
-                        if (Notification.permission === 'granted') {
-                            baslatBildirimSureci(true);
-                        }
-                        
-                        loadFeed();
-                    } else {
-                        errDiv.style.display = 'block';
-                        errDiv.innerText = "Hatalı şifre.";
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    currentUserUID = data.tenant_id;
+                    localStorage.setItem('tenant_id', currentUserUID);
+                    document.getElementById('login-overlay').style.display = 'none';
+
+                    if (Notification.permission === 'granted') {
+                        baslatBildirimSureci(true);
                     }
+                    loadFeed();
                 } else {
                     errDiv.style.display = 'block';
-                    errDiv.innerText = "Kullanıcı bulunamadı.";
+                    errDiv.innerText = data.message || "Hatalı giriş.";
                 }
-            }).catch((error) => {
+            } catch (error) {
                 console.error(error);
                 errDiv.style.display = 'block';
-                errDiv.innerText = "Hata: " + error.message;
-            });
+                errDiv.innerText = "Bağlantı hatası.";
+            }
         }
 
         window.logout = function() {
@@ -398,38 +378,59 @@
             document.getElementById('login-overlay').style.display = 'flex';
         }
 
-        // --- BİLDİRİM KAYDI ---
-        function baslatBildirimSureci(sessiz = false) {
-            if (!('serviceWorker' in navigator)) {
-                if (!sessiz) alert("Tarayıcınız bildirim özelliğini desteklemiyor veya bağlantınız Güvenli (HTTPS) değil. Lütfen 'https://' protokolünü kullandığınızdan emin olun.");
+        // --- BİLDİRİM KAYDI (Native Web Push) ---
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        async function baslatBildirimSureci(sessiz = false) {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                if (!sessiz) alert("Tarayıcınız bildirimleri desteklemiyor.");
                 return;
             }
-            
-            navigator.serviceWorker.register('/firebase-messaging-sw.js')
-            .then((registration) => {
-                if (registration.active) registration.update();
-                return Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        return getToken(messaging, {
-                            vapidKey: 'BGXlVznRESUJwIrT25sC7JHdOZGGAI1iiI1lheMcfvqsP50et1si7i2UFfXXDomEzy-et_agr11EK8lVZ2CtOwo',
-                            serviceWorkerRegistration: registration
-                        });
-                    } else {
-                        if (!sessiz) alert("Bildirim izni reddedildi. Ayarlardan izin vermeniz gerekebilir.");
-                    }
-                });
-            })
-            .then((token) => {
-                if (token) {
-                    saveTokenToDatabase(token);
-                    document.getElementById('notify-btn').style.display = 'none';
-                    if (!sessiz) alert("✅ Bildirimler başarıyla açıldı!");
+
+            try {
+                const registration = await navigator.serviceWorker.register('/static/sw.js');
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    if (!sessiz) alert("Bildirim izni reddedildi.");
+                    return;
                 }
-            })
-            .catch((err) => {
+
+                // Get VAPID key from backend
+                const vapidRes = await fetch('/api/vapid_public_key');
+                const vapidData = await vapidRes.json();
+                const applicationServerKey = urlBase64ToUint8Array(vapidData.public_key);
+
+                const subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: applicationServerKey
+                });
+
+                // Send subscription to backend
+                await fetch('/api/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        tenant_id: localStorage.getItem('tenant_id'),
+                        subscription: subscription.toJSON()
+                    })
+                });
+
+                document.getElementById('notify-btn').style.display = 'none';
+                if (!sessiz) alert("✅ Bildirimler başarıyla açıldı!");
+
+            } catch (err) {
                 console.error(err);
-                if (!sessiz) alert("Bildirim servisi başlatılamadı!\nSebep: " + err.message + "\n\nİpucu: Eğer iPhone kullanıyorsanız ve yerel ağdan bağlanıyorsanız (http://192.168...), iOS güvenlik nedeniyle bildirimleri engeller. HTTPS veya localhost gereklidir.");
-            });
+                if (!sessiz) alert("Bildirim kaydı oluşturulamadı: " + err.message);
+            }
         }
 
         if ('Notification' in window) {
@@ -438,32 +439,13 @@
                 btn.style.display = 'block';
                 btn.onclick = function() { baslatBildirimSureci(false); };
             } else if (Notification.permission === 'granted') {
-                baslatBildirimSureci(true); // Sayfa yenilendiğinde sessizce token al
+                baslatBildirimSureci(true);
             }
         }
 
-        function saveTokenToDatabase(token) {
-            const db = getDatabase(app);
-            const tid = localStorage.getItem('tenant_id');
-            
-            // Sadece Tenant ID varsa kaydet
-            if (tid) {
-                set(ref(db, 'abone_bekleyenler/' + token), {
-                    tarih: new Date().toISOString(),
-                    platform: navigator.platform,
-                    userAgent: navigator.userAgent,
-                    tenant_id: tid
-                });
-            } else {
-                console.log("Token alındı ancak Tenant ID yok. Kayıt ertelendi.");
-            }
-        }
-
-        // Bildirim Yakalama
-        onMessage(messaging, (payload) => {
-            const title = payload.notification?.title || payload.data?.haber_baslik || payload.data?.title || "X Gündem Raporu";
-            const body = payload.notification?.body || payload.data?.haber_ozet || payload.data?.body || "Yeni gelişme.";
-            new Notification(title, { body: body, icon: '/ikon.png' });
+        // Push Service Worker Listener for foreground (Optional, handled by SW mainly)
+        navigator.serviceWorker.addEventListener('message', event => {
+            // Can be used if SW sends a message to foreground client
         });
 
         // --- AKIŞ ---
@@ -480,8 +462,7 @@
             if (!currentUserUID) return;
             
             try {
-                const dbUrl = `https://x-gundem-raporu-default-rtdb.europe-west1.firebasedatabase.app/tenants/${currentUserUID}/gundem.json`;
-                const res = await fetch(dbUrl);
+                const res = await fetch(`/api/feed?tenant_id=${currentUserUID}`);
                 const data = await res.json();
                 renderFeed(data);
             } catch (e) { console.error(e); }
