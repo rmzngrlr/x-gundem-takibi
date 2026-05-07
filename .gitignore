@@ -1,0 +1,7 @@
+.env
+keys.txt
+private_key.pem
+public_key.pem
+flask_log.txt
+__pycache__/
+nohup.out

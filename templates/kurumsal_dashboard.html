@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Kurumsal Panel</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #0E1117; color: #FFF; padding: 20px; }
+        .container { max-width: 900px; margin: auto; display: flex; gap: 20px; }
+        .sidebar { width: 300px; }
+        .main { flex: 1; }
+        .card { background: #262730; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #444;}
+        input, select, textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #1c1e24; color: white; box-sizing: border-box; margin-bottom: 10px;}
+        button { padding: 10px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; width: 100%; }
+        .btn-green { background: #17b169; color: white; }
+        .btn-red { background: #f4212e; color: white; }
+        .btn-blue { background: #1d9bf0; color: white; }
+        .btn-outline { background: transparent; border: 1px solid #f4212e; color: #f4212e; }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 20px; margin-bottom: 20px;}
+        a { color: #1d9bf0; text-decoration: none; }
+        ul { list-style: none; padding: 0; }
+        li { background: #1c1e24; padding: 10px; margin-bottom: 5px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;}
+    </style>
+</head>
+<body>
+    <div class="header" style="max-width: 900px; margin: auto; margin-bottom: 20px;">
+        <h2>🚀 Kurumsal Panel - {{ tenant_id }}</h2>
+        <a href="{{ url_for('logout') }}">Çıkış Yap</a>
+    </div>
+
+    <div class="container">
+        <!-- Sol Menü: Ayarlar -->
+        <div class="sidebar">
+            <div class="card">
+                <h3>⚙️ Ayarlar</h3>
+                <form action="{{ url_for('kurumsal_save_settings') }}" method="POST">
+                    <label>Yöntem</label>
+                    <select name="tarama_tipi">
+                        <option value="Kullanıcı Listesi" {% if settings.tarama_tipi == 'Kullanıcı Listesi' %}selected{% endif %}>Kullanıcı Listesi</option>
+                        <option value="Twitter Liste URL" {% if settings.tarama_tipi == 'Twitter Liste URL' %}selected{% endif %}>Twitter Liste URL</option>
+                    </select>
+
+                    <label>Hedef (Virgülle veya URL)</label>
+                    <textarea name="hedef_veri" rows="3">{{ settings.hedef_veri }}</textarea>
+
+                    <label style="display:flex; align-items:center; gap:10px;">
+                        <input type="checkbox" name="ai_aktif" style="width:auto;" {% if settings.ai_aktif %}checked{% endif %}>
+                        🤖 AI ile Haber Yaz
+                    </label>
+
+                    <label>Tarama Sıklığı (Dk)</label>
+                    <input type="number" name="dakika" value="{{ settings.dakika }}" min="1" max="60">
+
+                    <button type="submit" class="btn-green" style="margin-bottom: 10px;">💾 Ayarları Kaydet</button>
+                </form>
+
+                <hr style="border-color: #444; margin: 15px 0;">
+
+                <form action="/kurumsal/start_stop" method="POST">
+                    {% if is_running %}
+                        <button type="submit" name="action" value="stop" class="btn-red">⏹️ DURDUR</button>
+                    {% else %}
+                        <button type="submit" name="action" value="start" class="btn-blue">▶️ BAŞLAT</button>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        <!-- Sağ Menü: Personeller -->
+        <div class="main">
+            <div class="card">
+                <h3>👥 Çalışan Yönetimi</h3>
+                <form action="{{ url_for('kurumsal_add_employee') }}" method="POST" style="display:flex; gap:10px; margin-bottom: 20px;">
+                    <input type="text" name="username" placeholder="Kullanıcı Adı" required>
+                    <input type="password" name="password" placeholder="Şifre" required>
+                    <button type="submit" class="btn-green" style="width: 150px;">➕ Ekle</button>
+                </form>
+
+                <h4>Mevcut Personeller</h4>
+                {% if employees %}
+                    <ul>
+                        {% for emp in employees %}
+                        <li>
+                            <span>👤 <b>{{ emp.username }}</b></span>
+                            <form action="{{ url_for('kurumsal_delete_employee', employee_id=emp.id) }}" method="POST" style="margin:0;">
+                                <button type="submit" class="btn-outline" style="padding: 5px 10px;">Sil 🗑️</button>
+                            </form>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p style="color: gray;">Kayıtlı personel yok.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>
