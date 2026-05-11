@@ -1,10 +1,11 @@
 undetected-chromedriver
 selenium
 requests
-firebase-admin
 groq
 scikit-learn
 pandas
 flask
 mysql-connector-python
 python-dotenv
+pywebpush
+cryptography
