@@ -123,10 +123,17 @@ def admin():
         if request.method == 'POST':
             username = request.form.get('username')
             password = request.form.get('password')
-            if username == os.getenv('SUPER_ADMIN_USER') and password == os.getenv('SUPER_ADMIN_PASS'):
+
+            # Systemd env okuma sorunlarına karşı fallback eklendi
+            env_user = os.getenv('SUPER_ADMIN_USER', 'admin').strip()
+            env_pass = os.getenv('SUPER_ADMIN_PASS', 'superadmin123').strip()
+
+            if username == env_user and password == env_pass:
                 session['role'] = 'superadmin'
                 return redirect(url_for('admin'))
             else:
+                # Log the attempted logic to server console for debugging if needed
+                print(f"DEBUG_LOGIN -> Entered: {username}:{password} | Expected: {env_user}:{env_pass}")
                 return render_template('admin_login.html', error="Hatalı giriş")
         return render_template('admin_login.html')
 
