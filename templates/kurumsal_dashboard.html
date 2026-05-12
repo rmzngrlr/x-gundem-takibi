@@ -55,67 +55,50 @@
                 <button type="submit" class="btn btn-success w-100 fw-bold">💾 Ayarları Kaydet</button>
             </form>
         </div>
-    </div>
 
-    <!-- Sağ Menü: Personel Yönetimi -->
-    <div class="col-lg-8 mb-4">
-        <div class="card p-4 h-100">
-            <h5 class="fw-bold mb-4">👥 Çalışan (Personel) Yönetimi</h5>
+        <!-- Çalışan Yönetimi (Sola Taşındı) -->
+        <div class="card p-4 mt-4">
+            <h5 class="fw-bold mb-3">👥 Çalışan Yönetimi</h5>
 
-            <!-- Personel Ekleme Formu -->
-            <form action="{{ url_for('kurumsal_add_employee') }}" method="POST" class="row g-2 mb-4 align-items-end" onsubmit="showLoading()">
-                <div class="col-md-5">
-                    <label class="form-label small text-muted">Kullanıcı Adı</label>
-                    <input type="text" name="username" class="form-control" placeholder="Örn: ahmet_yilmaz" required>
+            <form action="{{ url_for('kurumsal_add_employee') }}" method="POST" onsubmit="showLoading()">
+                <div class="mb-2">
+                    <input type="text" name="username" class="form-control form-control-sm" placeholder="Kullanıcı Adı" required>
                 </div>
-                <div class="col-md-5">
-                    <label class="form-label small text-muted">Şifre</label>
-                    <input type="password" name="password" class="form-control" required>
+                <div class="mb-3">
+                    <input type="password" name="password" class="form-control form-control-sm" placeholder="Şifre" required>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100 fw-bold">➕ Ekle</button>
-                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">➕ Ekle</button>
             </form>
 
-            <hr class="text-muted">
+            <hr class="text-muted my-3">
 
-            <!-- Personel Listesi -->
-            <h6 class="fw-bold mb-3 mt-3">Mevcut Personeller</h6>
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Personel Adı</th>
-                            <th class="text-end">İşlem</th>
-                        </tr>
-                    </thead>
+                <table class="table table-sm table-hover align-middle mb-0">
                     <tbody>
                         {% for emp in employees %}
                         <tr>
-                            <td class="fw-bold">👤 {{ emp.username }}</td>
-                            <td class="text-end">
+                            <td class="small fw-bold border-0">👤 {{ emp.username }}</td>
+                            <td class="text-end border-0">
                                 <form action="{{ url_for('kurumsal_delete_employee', employee_id=emp.id) }}" method="POST" onsubmit="confirmAction(event, this, 'Personeli Sil', '{{ emp.username }} adlı personeli silmek istediğinize emin misiniz?')">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger">Sil 🗑️</button>
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 0.75rem;">Sil 🗑️</button>
                                 </form>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="2" class="text-center text-muted py-4">Kayıtlı personel bulunmamaktadır.</td>
+                            <td colspan="2" class="text-center text-muted small border-0">Kayıtlı personel yok.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-
         </div>
-    </div>
-</div>
 
-<!-- Alt Kısım: Haber Akışı / Arşiv -->
-<div class="row mt-2">
-    <div class="col-12">
-        <div class="card p-4">
+    </div>
+
+    <!-- Sağ Menü: Canlı Haber Akışı (Ana Odak) -->
+    <div class="col-lg-8 mb-4">
+        <div class="card p-4 h-100">
             <h5 class="fw-bold mb-4">📰 Canlı Haber Akışı</h5>
 
             <!-- Basit Kategori Filtreleme (Opsiyonel) -->
