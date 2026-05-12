@@ -63,11 +63,36 @@ class TwitterScraperThread(threading.Thread):
         options = uc.ChromeOptions()
         options.add_argument("--start-maximized")
         options.add_argument("--disable-notifications")
-        # Ubuntu desktop ortamı için headless DEĞİL (kullanıcı görsün istedi)
+
+        # Systemd servisleri ekrana (Display) sahip olmadığı için
+        # Fiziksel arayüz açmaya çalışırsa çöker.
+        # Bunu önlemek için arkaplan (headless) modu zorunludur.
+        options.add_argument("--headless=new")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
 
         try:
             self.driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True)
         except Exception as e:
+            if "This version of ChromeDriver only supports Chrome version" in str(e):
+                try:
+                    match = re.search(r"Current browser version is\s+(\d+)", str(e))
+                    if match:
+                        main_version = int(match.group(1))
+                        # Re-create options as it cannot be reused
+                        new_options = uc.ChromeOptions()
+                        new_options.add_argument("--start-maximized")
+                        new_options.add_argument("--disable-notifications")
+                        new_options.add_argument("--headless=new")
+                        new_options.add_argument("--disable-gpu")
+                        new_options.add_argument("--no-sandbox")
+                        new_options.add_argument("--disable-dev-shm-usage")
+                        self.driver = uc.Chrome(options=new_options, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
+                        return
+                except Exception as e2:
+                    print(f"[{self.tenant_id}] Tarayıcı başlatılamadı (Sürüm düzeltme başarısız): {e2}")
+
             print(f"[{self.tenant_id}] Tarayıcı hatası: {e}")
             self.running = False
 
