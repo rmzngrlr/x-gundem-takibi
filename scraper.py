@@ -63,14 +63,14 @@ class TwitterScraperThread(threading.Thread):
         options = uc.ChromeOptions()
         options.add_argument("--start-maximized")
         options.add_argument("--disable-notifications")
-
-        # Systemd servisleri ekrana (Display) sahip olmadığı için
-        # Fiziksel arayüz açmaya çalışırsa çöker.
-        # Bunu önlemek için arkaplan (headless) modu zorunludur.
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-gpu")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+
+        # Kullanıcının fiziksel Chrome görmesi istendiği için headless kaldırıldı
+        # Ancak X11/Wayland çökmelerini engellemek için DISPLAY ayarı yapılır
+        if "DISPLAY" not in os.environ:
+            os.environ["DISPLAY"] = ":0"
 
         # Olası Chrome binary yollarını bul
         binary_location = None
@@ -89,10 +89,11 @@ class TwitterScraperThread(threading.Thread):
         print(f"[{self.tenant_id}] Chrome driver baslatiliyor... (Bulunan binary: {binary_location})", flush=True)
         try:
             if binary_location:
-                self.driver = uc.Chrome(options=options, browser_executable_path=binary_location, user_data_dir=profile_path, use_subprocess=True)
+                # Masaüstünde izleme için use_subprocess=False daha stabil olabilir (bazı Ubuntu sürümlerinde)
+                self.driver = uc.Chrome(options=options, browser_executable_path=binary_location, user_data_dir=profile_path, use_subprocess=False)
             else:
-                # Fallback to uc's auto-detection if none found (might still throw the Binary Location error)
-                self.driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True)
+                # Fallback to uc's auto-detection
+                self.driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=False)
             print(f"[{self.tenant_id}] Chrome basariyla baslatildi.", flush=True)
         except Exception as e:
             if "This version of ChromeDriver only supports Chrome version" in str(e):
