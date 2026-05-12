@@ -72,9 +72,27 @@ class TwitterScraperThread(threading.Thread):
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
 
-        print(f"[{self.tenant_id}] Chrome driver baslatiliyor...", flush=True)
+        # Olası Chrome binary yollarını bul
+        binary_location = None
+        common_paths = [
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/usr/bin/chromium-browser",
+            "/usr/bin/chromium",
+            "/snap/bin/chromium"
+        ]
+        for path in common_paths:
+            if os.path.exists(path):
+                binary_location = path
+                break
+
+        print(f"[{self.tenant_id}] Chrome driver baslatiliyor... (Bulunan binary: {binary_location})", flush=True)
         try:
-            self.driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True)
+            if binary_location:
+                self.driver = uc.Chrome(options=options, browser_executable_path=binary_location, user_data_dir=profile_path, use_subprocess=True)
+            else:
+                # Fallback to uc's auto-detection if none found (might still throw the Binary Location error)
+                self.driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True)
             print(f"[{self.tenant_id}] Chrome basariyla baslatildi.", flush=True)
         except Exception as e:
             if "This version of ChromeDriver only supports Chrome version" in str(e):
@@ -91,7 +109,10 @@ class TwitterScraperThread(threading.Thread):
                         new_options.add_argument("--disable-gpu")
                         new_options.add_argument("--no-sandbox")
                         new_options.add_argument("--disable-dev-shm-usage")
-                        self.driver = uc.Chrome(options=new_options, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
+                        if binary_location:
+                            self.driver = uc.Chrome(options=new_options, browser_executable_path=binary_location, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
+                        else:
+                            self.driver = uc.Chrome(options=new_options, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
                         print(f"[{self.tenant_id}] Chrome (Fallback) basariyla baslatildi.", flush=True)
                         return
                 except Exception as e2:
