@@ -243,7 +243,16 @@ def kurumsal():
         cursor.close()
         conn.close()
 
-    is_running = tenant_id in app.scraper_threads and app.scraper_threads[tenant_id].running
+    # Arka plandaki worker/thread durumunu kontrol edip state'i belirle.
+    # .is_alive() kullanarak thread'in gercekten çalisip calismadigini kesinleştiriyoruz.
+    is_running = False
+    if tenant_id in app.scraper_threads:
+        thread = app.scraper_threads[tenant_id]
+        if thread.is_alive() and thread.running:
+            is_running = True
+        else:
+            # Ölü threadleri temizle
+            del app.scraper_threads[tenant_id]
 
     return render_template('kurumsal_dashboard.html', tenant_id=tenant_id, employees=employees, settings=settings, is_running=is_running)
 

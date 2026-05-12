@@ -105,10 +105,7 @@ class TwitterScraperThread(threading.Thread):
                         new_options = uc.ChromeOptions()
                         new_options.add_argument("--start-maximized")
                         new_options.add_argument("--disable-notifications")
-                        new_options.add_argument("--headless=new")
-                        new_options.add_argument("--disable-gpu")
-                        new_options.add_argument("--no-sandbox")
-                        new_options.add_argument("--disable-dev-shm-usage")
+                        # Kullanıcının fiziksel Chrome görmesi istendiği için headless kaldırıldı
                         if binary_location:
                             self.driver = uc.Chrome(options=new_options, browser_executable_path=binary_location, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
                         else:
