@@ -3,11 +3,9 @@ import time
 import random
 import re
 import json
+import sys
 import threading
 from datetime import datetime
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from difflib import SequenceMatcher
@@ -15,6 +13,20 @@ from groq import Groq
 from database import get_db_connection
 import requests
 from pywebpush import webpush, WebPushException
+
+uc = None
+By = None
+WebDriverWait = None
+
+def ensure_selenium_imports():
+    global uc, By, WebDriverWait
+    if uc is None:
+        import undetected_chromedriver as _uc
+        from selenium.webdriver.common.by import By as _By
+        from selenium.webdriver.support.ui import WebDriverWait as _WebDriverWait
+        uc = _uc
+        By = _By
+        WebDriverWait = _WebDriverWait
 
 class TwitterScraperThread(threading.Thread):
     def __init__(self, tenant_id):
@@ -57,15 +69,19 @@ class TwitterScraperThread(threading.Thread):
             self.driver = None
 
     def start_browser(self):
-        profile_path = os.path.join(os.getcwd(), f"ozel_twitter_profili_{self.tenant_id}")
+        ensure_selenium_imports()
+        profile_path = os.path.join(os.getcwd(), f"chrome_profile_{self.tenant_id}")
         if not os.path.exists(profile_path): os.makedirs(profile_path)
 
         options = uc.ChromeOptions()
         options.add_argument("--start-maximized")
-        options.add_argument("--disable-notifications")
+        options.add_argument("--disable-session-crashed-bubble")
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
+        options.add_argument("--disable-infobars")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
-        options.add_argument("--disable-gpu")
 
         # Kullanıcının fiziksel Chrome görmesi istendiği için headless kaldırıldı
         # Ancak X11/Wayland çökmelerini engellemek için DISPLAY ayarı yapılır
@@ -89,11 +105,9 @@ class TwitterScraperThread(threading.Thread):
         print(f"[{self.tenant_id}] Chrome driver baslatiliyor... (Bulunan binary: {binary_location})", flush=True)
         try:
             if binary_location:
-                # Masaüstünde izleme için use_subprocess=False daha stabil olabilir (bazı Ubuntu sürümlerinde)
-                self.driver = uc.Chrome(options=options, browser_executable_path=binary_location, user_data_dir=profile_path, use_subprocess=False)
+                self.driver = uc.Chrome(options=options, browser_executable_path=binary_location, user_data_dir=profile_path, use_subprocess=True)
             else:
-                # Fallback to uc's auto-detection
-                self.driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=False)
+                self.driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True)
             print(f"[{self.tenant_id}] Chrome basariyla baslatildi.", flush=True)
         except Exception as e:
             if "This version of ChromeDriver only supports Chrome version" in str(e):
