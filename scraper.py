@@ -190,21 +190,34 @@ class TwitterScraperThread(threading.Thread):
 
     def haber_metni_olustur_groq(self, grup):
         client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        text = "\\n- ".join([f"@{t['hesap']}: {t['metin']}" for t in grup])
+        text = "\n- ".join([f"@{t['hesap']}: {t['metin']}" for t in grup])
         prompt = f"""
-        Aşağıdaki tweetleri tarafsız haber diliyle özetle. Kategori seç: Politika, Ekonomi, Spor, Gündem.
+        Aşağıdaki tweetleri tarafsız haber diliyle özetle. Kategorilerden SADECE BİRİNİ seç: Politika, Ekonomi, Spor, Gündem.
         Tweetler: {text}
-        Çıktı JSON olsun: {{"ozet": "...", "kategori": "..."}}
+        Çıktı SADECE geçerli bir JSON olmalıdır. Ekstra hiçbir metin ekleme: {{"ozet": "...", "kategori": "..."}}
         """
         try:
             completion = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
-                temperature=0.3, max_tokens=250, response_format={"type": "json_object"}
+                temperature=0.2, max_tokens=250, response_format={"type": "json_object"}
             )
-            j = json.loads(completion.choices[0].message.content)
-            return j.get("ozet", grup[0]['metin']), j.get("kategori", "Gündem")
-        except: return grup[0]['metin'], "Gündem"
+            content = completion.choices[0].message.content
+
+            # Markdown block fallback
+            content = content.replace("```json", "").replace("```", "").strip()
+
+            j = json.loads(content)
+
+            # Kategori Doğrulama
+            kat = j.get("kategori", "Gündem").strip().capitalize()
+            if kat not in ["Politika", "Ekonomi", "Spor", "Gündem"]:
+                kat = "Gündem"
+
+            return j.get("ozet", grup[0]['metin']), kat
+        except Exception as e:
+            print(f"[{self.tenant_id}] AI JSON Parse Hatası: {e}", flush=True)
+            return grup[0]['metin'], "Gündem"
 
     def semantik_analiz(self, tweetler, threshold=0.35):
         if len(tweetler) < 2: return []
