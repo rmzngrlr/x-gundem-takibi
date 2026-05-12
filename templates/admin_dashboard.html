@@ -1,66 +1,70 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <title>Süper Admin Paneli</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #0E1117; color: #FFF; padding: 20px; }
-        .container { max-width: 800px; margin: auto; }
-        .card { background: #262730; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        input { padding: 10px; border-radius: 5px; border: none; margin-right: 10px; }
-        button { padding: 10px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
-        .btn-green { background: #17b169; color: white; }
-        .btn-red { background: #f4212e; color: white; }
-        .btn-blue { background: #1d9bf0; color: white; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #444; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 20px; margin-bottom: 20px;}
-        a { color: #1d9bf0; text-decoration: none; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h2>👮 Süper Admin Paneli</h2>
-            <a href="{{ url_for('logout') }}">Çıkış Yap</a>
-        </div>
+{% extends "base.html" %}
 
-        <div class="card">
-            <h3>➕ Yeni Kurum Ekle</h3>
-            <form action="{{ url_for('admin_add_tenant') }}" method="POST">
-                <input type="text" name="tenant_id" placeholder="Kurum Adı (Kullanıcı Adı)" required>
-                <input type="password" name="password" placeholder="Şifre" required>
-                <button type="submit" class="btn-green">Kurumu Kaydet</button>
+{% block title %}Süper Admin Paneli{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sol Taraf: Yeni Kurum Ekleme -->
+    <div class="col-md-4 mb-4">
+        <div class="card p-4 h-100">
+            <h5 class="fw-bold mb-3">➕ Yeni Kurum Ekle</h5>
+            <form action="{{ url_for('admin_add_tenant') }}" method="POST" onsubmit="showLoading()">
+                <div class="mb-3">
+                    <label class="form-label">Kurum Adı <small class="text-muted">(Boşluksuz)</small></label>
+                    <input type="text" name="tenant_id" class="form-control" placeholder="Örn: sirketim" required>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label">Şifre</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-success w-100 fw-bold">Kurumu Kaydet</button>
             </form>
         </div>
+    </div>
 
-        <div class="card">
-            <h3>📋 Kayıtlı Kurumlar</h3>
-            <table>
-                <tr>
-                    <th>Kurum Adı</th>
-                    <th>Durum</th>
-                    <th>Çalışan Sayısı</th>
-                    <th>İşlem</th>
-                </tr>
-                {% for t in tenants %}
-                <tr>
-                    <td>🏢 <b>{{ t.tenant_id }}</b></td>
-                    <td>
-                        <form action="{{ url_for('admin_toggle_tenant', tenant_id=t.tenant_id) }}" method="POST" style="display:inline;">
-                            <button type="submit" class="btn-blue">{{ 'Aktif' if t.active else 'Pasif (Etkinleştir)' }}</button>
-                        </form>
-                    </td>
-                    <td>{{ t.employee_count }}</td>
-                    <td>
-                        <form action="{{ url_for('admin_delete_tenant', tenant_id=t.tenant_id) }}" method="POST" style="display:inline;" onsubmit="return confirm('Emin misiniz? Tüm veriler silinecek!');">
-                            <button type="submit" class="btn-red">Sil 🗑️</button>
-                        </form>
-                    </td>
-                </tr>
-                {% endfor %}
-            </table>
+    <!-- Sağ Taraf: Kurumlar Listesi -->
+    <div class="col-md-8 mb-4">
+        <div class="card p-4 h-100">
+            <h5 class="fw-bold mb-3">📋 Kayıtlı Kurumlar</h5>
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Kurum Adı</th>
+                            <th>Çalışan Sayısı</th>
+                            <th>Durum</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for t in tenants %}
+                        <tr>
+                            <td class="fw-bold text-primary">🏢 {{ t.tenant_id }}</td>
+                            <td><span class="badge bg-secondary rounded-pill fs-6">{{ t.employee_count }}</span></td>
+                            <td>
+                                <form action="{{ url_for('admin_toggle_tenant', tenant_id=t.tenant_id) }}" method="POST" class="d-inline" onsubmit="showLoading()">
+                                    {% if t.active %}
+                                        <button type="submit" class="btn btn-sm btn-outline-success">Aktif</button>
+                                    {% else %}
+                                        <button type="submit" class="btn btn-sm btn-outline-warning">Pasif (Etkinleştir)</button>
+                                    {% endif %}
+                                </form>
+                            </td>
+                            <td>
+                                <form action="{{ url_for('admin_delete_tenant', tenant_id=t.tenant_id) }}" method="POST" class="d-inline" onsubmit="confirmAction(event, this, 'Kurumu Sil', 'Bu kurumu ve ona ait tüm verileri silmek istediğinize emin misiniz?')">
+                                    <button type="submit" class="btn btn-sm btn-danger">Sil 🗑️</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">Henüz kayıtlı kurum bulunmamaktadır.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}
