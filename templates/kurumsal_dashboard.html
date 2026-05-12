@@ -111,4 +111,127 @@
         </div>
     </div>
 </div>
+
+<!-- Alt Kısım: Haber Akışı / Arşiv -->
+<div class="row mt-2">
+    <div class="col-12">
+        <div class="card p-4">
+            <h5 class="fw-bold mb-4">📰 Canlı Haber Akışı</h5>
+
+            <!-- Basit Kategori Filtreleme (Opsiyonel) -->
+            <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#feed-all" type="button" onclick="filterFeed('all')">Tümü</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#feed-pol" type="button" onclick="filterFeed('Politika')">Politika</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#feed-eco" type="button" onclick="filterFeed('Ekonomi')">Ekonomi</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#feed-gun" type="button" onclick="filterFeed('Gündem')">Gündem</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" data-bs-toggle="pill" data-bs-target="#feed-spo" type="button" onclick="filterFeed('Spor')">Spor</button>
+                </li>
+            </ul>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 15%">Tarih/Zaman</th>
+                            <th style="width: 10%">Kategori</th>
+                            <th style="width: 45%">Haber Özeti</th>
+                            <th style="width: 30%">Kaynaklar</th>
+                        </tr>
+                    </thead>
+                    <tbody id="news-table-body">
+                        <!-- AJAX ile doldurulacak -->
+                        <tr><td colspan="4" class="text-center text-muted">Haberler yükleniyor...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const tenantId = "{{ tenant_id }}";
+    let allNewsData = [];
+
+    async function fetchNews() {
+        try {
+            const res = await fetch(`/api/feed?tenant_id=${tenantId}`);
+            const data = await res.json();
+
+            // Veriyi Objeden Array'e çevir ve ID'ye göre sırala (En yeni en üstte)
+            allNewsData = Object.keys(data).map(key => data[key]).reverse();
+
+            // Aktif sekmeyi bul ve filtrele
+            const activeTabBtn = document.querySelector('#pills-tab .nav-link.active');
+            let filter = 'all';
+            if(activeTabBtn && activeTabBtn.innerText !== 'Tümü') {
+                filter = activeTabBtn.innerText;
+            }
+            renderTable(filter);
+
+        } catch (e) {
+            console.error("Haberler çekilirken hata:", e);
+        }
+    }
+
+    function renderTable(kategori) {
+        const tbody = document.getElementById('news-table-body');
+        tbody.innerHTML = '';
+
+        let filtered = allNewsData;
+        if (kategori !== 'all') {
+            filtered = allNewsData.filter(n => (n.kategori || 'Gündem') === kategori);
+        }
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Bu kategoride henüz haber yok.</td></tr>';
+            return;
+        }
+
+        filtered.forEach(item => {
+            const tr = document.createElement('tr');
+
+            let badgeColor = 'secondary';
+            let cat = item.kategori || 'Gündem';
+            if(cat === 'Politika') badgeColor = 'danger';
+            if(cat === 'Ekonomi') badgeColor = 'success';
+            if(cat === 'Spor') badgeColor = 'warning';
+            if(cat === 'Gündem') badgeColor = 'primary';
+
+            tr.innerHTML = `
+                <td class="date-col text-muted small">
+                    <div class="fw-bold text-dark">${item.zaman || ''}</div>
+                    ${item.tarih || ''}
+                </td>
+                <td><span class="badge bg-${badgeColor}">${cat}</span></td>
+                <td class="fw-medium">${item.haber}</td>
+                <td class="link-col small text-muted">
+                    <ul class="mb-0 ps-3">
+                        ${item.kaynaklar || '-'}
+                    </ul>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Tümü/Kategori butonlarına basıldığında
+    window.filterFeed = function(kat) {
+        renderTable(kat);
+    }
+
+    // İlk yükleme ve 15 saniyede bir otomatik güncelleme
+    fetchNews();
+    setInterval(fetchNews, 15000);
+</script>
 {% endblock %}
