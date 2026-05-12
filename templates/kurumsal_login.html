@@ -1,25 +1,44 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <title>Kurumsal Giriş</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #0E1117; color: #FFF; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-        .box { background: #262730; padding: 40px; border-radius: 10px; text-align: center; width: 300px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: none; border-radius: 5px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #1d9bf0; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        .error { color: #f4212e; margin-top: 10px; font-size: 14px; }
-    </style>
-</head>
-<body>
-    <div class="box">
-        <h2>🚀 Kurumsal Panel</h2>
-        <form method="POST">
-            <input type="text" name="tenant_id" placeholder="Kurum Adı" required>
-            <input type="password" name="password" placeholder="Şifre" required>
-            <button type="submit">Giriş Yap</button>
-            {% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% set hide_navbar = True %}
+{% extends "base.html" %}
+
+{% block title %}Kurumsal Panel Girişi{% endblock %}
+
+{% block head %}
+<style>
+    .login-container {
+        min-height: 80vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .login-card {
+        width: 100%;
+        max-width: 400px;
+        padding: 30px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="card login-card">
+        <div class="text-center mb-4">
+            <img src="/static/ikon.png" alt="Logo" width="60" class="mb-3 rounded">
+            <h4 class="fw-bold text-primary">Kurumsal Panel</h4>
+            <p class="text-muted small">Şirket hesabınızla giriş yapın.</p>
+        </div>
+
+        <form method="POST" onsubmit="showLoading()">
+            <div class="mb-3">
+                <label class="form-label">Kurum Adı</label>
+                <input type="text" name="tenant_id" class="form-control" placeholder="Örn: sirketim" required>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">Şifre</label>
+                <input type="password" name="password" class="form-control" placeholder="••••••" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100 fw-bold">Giriş Yap</button>
         </form>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

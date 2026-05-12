@@ -1,97 +1,114 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <title>Kurumsal Panel</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #0E1117; color: #FFF; padding: 20px; }
-        .container { max-width: 900px; margin: auto; display: flex; gap: 20px; }
-        .sidebar { width: 300px; }
-        .main { flex: 1; }
-        .card { background: #262730; padding: 20px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #444;}
-        input, select, textarea { width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #1c1e24; color: white; box-sizing: border-box; margin-bottom: 10px;}
-        button { padding: 10px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; width: 100%; }
-        .btn-green { background: #17b169; color: white; }
-        .btn-red { background: #f4212e; color: white; }
-        .btn-blue { background: #1d9bf0; color: white; }
-        .btn-outline { background: transparent; border: 1px solid #f4212e; color: #f4212e; }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 20px; margin-bottom: 20px;}
-        a { color: #1d9bf0; text-decoration: none; }
-        ul { list-style: none; padding: 0; }
-        li { background: #1c1e24; padding: 10px; margin-bottom: 5px; border-radius: 5px; display: flex; justify-content: space-between; align-items: center;}
-    </style>
-</head>
-<body>
-    <div class="header" style="max-width: 900px; margin: auto; margin-bottom: 20px;">
-        <h2>🚀 Kurumsal Panel - {{ tenant_id }}</h2>
-        <a href="{{ url_for('logout') }}">Çıkış Yap</a>
-    </div>
+{% extends "base.html" %}
 
-    <div class="container">
-        <!-- Sol Menü: Ayarlar -->
-        <div class="sidebar">
-            <div class="card">
-                <h3>⚙️ Ayarlar</h3>
-                <form action="{{ url_for('kurumsal_save_settings') }}" method="POST">
-                    <label>Yöntem</label>
-                    <select name="tarama_tipi">
+{% block title %}Kurumsal Panel{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Sol Menü: Ayarlar & Başlat/Durdur -->
+    <div class="col-lg-4 mb-4">
+        <!-- Başlat / Durdur Kartı -->
+        <div class="card p-4 text-center border-{{ 'danger' if is_running else 'primary' }}">
+            <h5 class="fw-bold mb-3">Tarama Durumu</h5>
+            {% if is_running %}
+                <div class="mb-3 text-danger fw-bold d-flex justify-content-center align-items-center">
+                    <div class="spinner-grow spinner-grow-sm me-2" role="status"></div>
+                    Sistem Çalışıyor
+                </div>
+                <form action="{{ url_for('kurumsal_start_stop') }}" method="POST" onsubmit="showLoading()">
+                    <button type="submit" name="action" value="stop" class="btn btn-danger w-100 fw-bold btn-lg">⏹️ DURDUR</button>
+                </form>
+            {% else %}
+                <div class="mb-3 text-secondary fw-bold">Beklemede</div>
+                <form action="{{ url_for('kurumsal_start_stop') }}" method="POST" onsubmit="showLoading()">
+                    <button type="submit" name="action" value="start" class="btn btn-primary w-100 fw-bold btn-lg">▶️ BAŞLAT</button>
+                </form>
+            {% endif %}
+        </div>
+
+        <!-- Ayarlar Kartı -->
+        <div class="card p-4">
+            <h5 class="fw-bold mb-3">⚙️ Ayarlar</h5>
+            <form action="{{ url_for('kurumsal_save_settings') }}" method="POST" onsubmit="showLoading()">
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Yöntem</label>
+                    <select name="tarama_tipi" class="form-select">
                         <option value="Kullanıcı Listesi" {% if settings.tarama_tipi == 'Kullanıcı Listesi' %}selected{% endif %}>Kullanıcı Listesi</option>
                         <option value="Twitter Liste URL" {% if settings.tarama_tipi == 'Twitter Liste URL' %}selected{% endif %}>Twitter Liste URL</option>
                     </select>
+                </div>
 
-                    <label>Hedef (Virgülle veya URL)</label>
-                    <textarea name="hedef_veri" rows="3">{{ settings.hedef_veri }}</textarea>
+                <div class="mb-3">
+                    <label class="form-label text-muted small">Hedef (Virgülle veya URL)</label>
+                    <textarea name="hedef_veri" class="form-control" rows="3" placeholder="Örn: trthaber, cnn">{{ settings.hedef_veri }}</textarea>
+                </div>
 
-                    <label style="display:flex; align-items:center; gap:10px;">
-                        <input type="checkbox" name="ai_aktif" style="width:auto;" {% if settings.ai_aktif %}checked{% endif %}>
-                        🤖 AI ile Haber Yaz
-                    </label>
+                <div class="mb-3 form-check form-switch">
+                    <input class="form-check-input" type="checkbox" name="ai_aktif" id="aiAktif" {% if settings.ai_aktif %}checked{% endif %}>
+                    <label class="form-check-label text-muted small" for="aiAktif">🤖 AI ile Haber Yaz</label>
+                </div>
 
-                    <label>Tarama Sıklığı (Dk)</label>
-                    <input type="number" name="dakika" value="{{ settings.dakika }}" min="1" max="60">
+                <div class="mb-4">
+                    <label class="form-label text-muted small">Tarama Sıklığı (Dk)</label>
+                    <input type="number" name="dakika" class="form-control" value="{{ settings.dakika }}" min="1" max="60">
+                </div>
 
-                    <button type="submit" class="btn-green" style="margin-bottom: 10px;">💾 Ayarları Kaydet</button>
-                </form>
-
-                <hr style="border-color: #444; margin: 15px 0;">
-
-                <form action="/kurumsal/start_stop" method="POST">
-                    {% if is_running %}
-                        <button type="submit" name="action" value="stop" class="btn-red">⏹️ DURDUR</button>
-                    {% else %}
-                        <button type="submit" name="action" value="start" class="btn-blue">▶️ BAŞLAT</button>
-                    {% endif %}
-                </form>
-            </div>
-        </div>
-
-        <!-- Sağ Menü: Personeller -->
-        <div class="main">
-            <div class="card">
-                <h3>👥 Çalışan Yönetimi</h3>
-                <form action="{{ url_for('kurumsal_add_employee') }}" method="POST" style="display:flex; gap:10px; margin-bottom: 20px;">
-                    <input type="text" name="username" placeholder="Kullanıcı Adı" required>
-                    <input type="password" name="password" placeholder="Şifre" required>
-                    <button type="submit" class="btn-green" style="width: 150px;">➕ Ekle</button>
-                </form>
-
-                <h4>Mevcut Personeller</h4>
-                {% if employees %}
-                    <ul>
-                        {% for emp in employees %}
-                        <li>
-                            <span>👤 <b>{{ emp.username }}</b></span>
-                            <form action="{{ url_for('kurumsal_delete_employee', employee_id=emp.id) }}" method="POST" style="margin:0;">
-                                <button type="submit" class="btn-outline" style="padding: 5px 10px;">Sil 🗑️</button>
-                            </form>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p style="color: gray;">Kayıtlı personel yok.</p>
-                {% endif %}
-            </div>
+                <button type="submit" class="btn btn-success w-100 fw-bold">💾 Ayarları Kaydet</button>
+            </form>
         </div>
     </div>
-</body>
-</html>
+
+    <!-- Sağ Menü: Personel Yönetimi -->
+    <div class="col-lg-8 mb-4">
+        <div class="card p-4 h-100">
+            <h5 class="fw-bold mb-4">👥 Çalışan (Personel) Yönetimi</h5>
+
+            <!-- Personel Ekleme Formu -->
+            <form action="{{ url_for('kurumsal_add_employee') }}" method="POST" class="row g-2 mb-4 align-items-end" onsubmit="showLoading()">
+                <div class="col-md-5">
+                    <label class="form-label small text-muted">Kullanıcı Adı</label>
+                    <input type="text" name="username" class="form-control" placeholder="Örn: ahmet_yilmaz" required>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label small text-muted">Şifre</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100 fw-bold">➕ Ekle</button>
+                </div>
+            </form>
+
+            <hr class="text-muted">
+
+            <!-- Personel Listesi -->
+            <h6 class="fw-bold mb-3 mt-3">Mevcut Personeller</h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Personel Adı</th>
+                            <th class="text-end">İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for emp in employees %}
+                        <tr>
+                            <td class="fw-bold">👤 {{ emp.username }}</td>
+                            <td class="text-end">
+                                <form action="{{ url_for('kurumsal_delete_employee', employee_id=emp.id) }}" method="POST" onsubmit="confirmAction(event, this, 'Personeli Sil', '{{ emp.username }} adlı personeli silmek istediğinize emin misiniz?')">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Sil 🗑️</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="2" class="text-center text-muted py-4">Kayıtlı personel bulunmamaktadır.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

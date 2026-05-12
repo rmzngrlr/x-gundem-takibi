@@ -72,14 +72,17 @@ class TwitterScraperThread(threading.Thread):
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
 
+        print(f"[{self.tenant_id}] Chrome driver baslatiliyor...", flush=True)
         try:
             self.driver = uc.Chrome(options=options, user_data_dir=profile_path, use_subprocess=True)
+            print(f"[{self.tenant_id}] Chrome basariyla baslatildi.", flush=True)
         except Exception as e:
             if "This version of ChromeDriver only supports Chrome version" in str(e):
                 try:
                     match = re.search(r"Current browser version is\s+(\d+)", str(e))
                     if match:
                         main_version = int(match.group(1))
+                        print(f"[{self.tenant_id}] Surum uymusmazligi. Sürüm {main_version} deneniyor...", flush=True)
                         # Re-create options as it cannot be reused
                         new_options = uc.ChromeOptions()
                         new_options.add_argument("--start-maximized")
@@ -89,11 +92,12 @@ class TwitterScraperThread(threading.Thread):
                         new_options.add_argument("--no-sandbox")
                         new_options.add_argument("--disable-dev-shm-usage")
                         self.driver = uc.Chrome(options=new_options, user_data_dir=profile_path, use_subprocess=True, version_main=main_version)
+                        print(f"[{self.tenant_id}] Chrome (Fallback) basariyla baslatildi.", flush=True)
                         return
                 except Exception as e2:
-                    print(f"[{self.tenant_id}] Tarayıcı başlatılamadı (Sürüm düzeltme başarısız): {e2}")
+                    print(f"[{self.tenant_id}] Tarayıcı başlatılamadı (Sürüm düzeltme başarısız): {e2}", flush=True)
 
-            print(f"[{self.tenant_id}] Tarayıcı hatası: {e}")
+            print(f"[{self.tenant_id}] Tarayıcı hatası: {e}", flush=True)
             self.running = False
 
     def oturum_kontrol(self):
@@ -264,8 +268,11 @@ class TwitterScraperThread(threading.Thread):
 
 
     def run(self):
+        print(f"[{self.tenant_id}] Scraper threadi basliyor...", flush=True)
         self.start_browser()
-        if not self.driver: return
+        if not self.driver:
+            print(f"[{self.tenant_id}] Driver baslatilamadigi icin thread sonlaniyor.", flush=True)
+            return
 
         while self.running:
             settings = self.get_settings()

@@ -1,549 +1,332 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>X Gündem Raporu</title>
-    <link rel="icon" type="image/png" href="/static/ikon.png">
-    <link rel="apple-touch-icon" href="/static/apple-ikon.png">
-    <link rel="manifest" href="/static/manifest.json">
-    <style>
-        /* Varsayılan Olarak Dark Mode (Streamlit Dark + Blue Accent) */
-        :root { 
-            --bg: #0E1117; 
-            --card: #262730; 
-            --text: #FAFAFA; 
-            --text-secondary: #BFC5C9;
-            --primary: #1d9bf0; 
-            --danger: #f4212e;
-            --border: #31333F; 
-        }
+{% set hide_navbar = True %}
+{% extends "base.html" %}
 
-        /* Login Overlay CSS */
-        .login-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: var(--bg); z-index: 2000;
-            display: flex; justify-content: center; align-items: center;
-            flex-direction: column;
-        }
-        .login-box {
-            background: var(--card); padding: 30px; border-radius: 12px;
-            border: 1px solid var(--border); width: 90%; max-width: 320px;
-            text-align: center;
-        }
-        .login-box input {
-            width: 100%; padding: 10px; margin: 10px 0;
-            background: #1c1e24; border: 1px solid var(--border);
-            color: #FAFAFA; border-radius: 6px; box-sizing: border-box;
-        }
-        .login-box input::placeholder {
-            color: #BFC5C9;
-            opacity: 0.7;
-        }
-        .login-box button {
-            width: 100%; padding: 10px; background: var(--primary);
-            color: white; border: none; border-radius: 6px;
-            font-weight: bold; cursor: pointer; margin-top: 10px;
-        }
-        .login-box button:hover { opacity: 0.9; }
-        .error-msg { color: var(--danger); font-size: 13px; margin-top: 10px; display: none; }
+{% block title %}Çalışan (PWA) Arayüzü{% endblock %}
 
-        /* Light Mode (İsteğe Bağlı) */
-        [data-theme="light"] { 
-            --bg: #ffffff; 
-            --card: #ffffff; 
-            --text: #0f1419; 
-            --text-secondary: #536471;
-            --primary: #1d9bf0; 
-            --danger: #f4212e;
-            --border: #cfd9de; 
+{% block head %}
+<link rel="manifest" href="/static/manifest.json">
+<style>
+    /* PWA Özel Konteyner ve Düzen */
+    body { padding-top: 60px; } /* Header boşluğu */
+
+    .app-header {
+        position: fixed; top: 0; left: 0; right: 0;
+        height: 60px; background: #fff;
+        border-bottom: 1px solid #e0e0e0;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 15px; z-index: 1000; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    /* Mobil Sekmeler */
+    .mobile-tabs {
+        display: flex; background: #fff; border-bottom: 1px solid #e0e0e0;
+        position: fixed; top: 60px; left: 0; right: 0; height: 45px;
+        z-index: 990; white-space: nowrap; overflow-x: auto;
+    }
+    .mobile-tabs button {
+        flex: 1; background: none; border: none; font-weight: 600; font-size: 14px;
+        color: #6c757d; border-bottom: 3px solid transparent; cursor: pointer;
+        padding: 0 15px; transition: all 0.3s;
+    }
+    .mobile-tabs button.active {
+        color: #0d6efd; border-bottom-color: #0d6efd;
+    }
+
+    /* PWA Grid/Flex Ana Yapı */
+    .pwa-container {
+        position: fixed; top: 105px; bottom: 0; left: 0; right: 0;
+        display: flex; overflow-x: auto; overflow-y: hidden;
+        scroll-snap-type: x mandatory; scroll-behavior: smooth;
+    }
+
+    .category-col {
+        flex: 0 0 100vw; min-width: 100vw; height: 100%;
+        display: flex; flex-direction: column; scroll-snap-align: start;
+    }
+
+    /* Masaüstü Grid Ayarı */
+    @media (min-width: 992px) {
+        body { padding-top: 60px; }
+        .mobile-tabs { display: none; }
+        .pwa-container {
+            position: static; display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 15px; padding: 20px; overflow: visible; height: auto;
         }
-
-        html, body { 
-            height: 100%; 
-            margin: 0; 
-            padding: 0; 
-            overflow: hidden; /* Global Scroll'u Kilitle */
-            overscroll-behavior: none;
-        }
-
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; transition: background 0.3s, color 0.3s; }
-        
-        /* --- HEADER (SABİT) --- */
-        .header { 
-            background: var(--bg); 
-            padding: 15px; 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-            border-bottom: 1px solid var(--border); 
-            position: absolute; /* Fixed yerine absolute */
-            top: 0; 
-            left: 0; 
-            right: 0; 
-            height: 60px; /* Sabit yükseklik */
-            z-index: 100; 
-            transition: background 0.3s, border-color 0.3s; 
-            box-sizing: border-box; 
-        }
-
-        .app-logo { width: 28px; height: 28px; object-fit: contain; border-radius: 6px; }
-        h1 { font-size: 18px; margin: 0; flex-grow: 1; font-weight: 800; }
-        
-        .icon-btn { background: none; border: none; cursor: pointer; padding: 8px; border-radius: 50%; color: var(--text); transition: 0.2s; display: flex; align-items: center; justify-content: center; }
-        .icon-btn:hover { background: rgba(128,128,128,0.1); }
-        .icon-btn svg { width: 20px; height: 20px; fill: currentColor; }
-        
-        .clear-btn { color: var(--danger); }
-        .clear-btn:active { transform: scale(0.90); }
-
-        .notify-btn { border: 1.5px solid var(--primary); color: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; background: none; margin-right: 5px; cursor: pointer; }
-        
-        /* --- ANA KONTEYNER (APP SHELL) --- */
-        .main-container {
-            position: absolute;
-            top: 60px; /* Header yüksekliği */
-            bottom: 0;
-            left: 0;
-            right: 0;
-            overflow: hidden;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0;
-        }
-
         .category-col {
-            border-right: 1px solid var(--border);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden; /* Konteyner scroll olmasın */
-            height: 100%;
-            padding: 0; /* Padding içeriğe taşındı */
-            box-sizing: border-box;
+            flex: auto; min-width: 0; height: auto; display: block;
         }
-        .category-col:last-child { border-right: none; }
+    }
 
-        .feed-content {
-            flex: 1;
-            overflow-y: auto; /* İÇERİK BURADA SCROLL OLACAK */
-            padding: 10px;
-        }
+    .feed-content {
+        flex: 1; overflow-y: auto; padding: 15px;
+    }
+    @media (min-width: 992px) {
+        .feed-content { overflow-y: visible; padding: 0; }
+    }
 
-        .col-header {
-            padding: 15px;
-            font-weight: 800;
-            font-size: 14px;
-            /* text-transform: uppercase; REMOVED per user request */
-            letter-spacing: 0.5px;
-            border-bottom: 1px solid var(--border);
-            text-align: center;
-            background: var(--bg); 
-            /* Sticky kaldırıldı, statik yapıda kalacak */
-            flex-shrink: 0;
-            z-index: 10;
-            margin-bottom: 0;
-        }
-        
-        /* Şık Kart Tasarımı (V2 Görünümü) */
-        .card { 
-            background: var(--card); 
-            padding: 16px; 
-            border: 1px solid var(--border); 
-            border-radius: 16px; 
-            margin-bottom: 12px;
-            transition: background 0.3s, border-color 0.3s; 
-        }
+    /* Haber Kartları */
+    .news-card {
+        background: #fff; border-radius: 12px; padding: 15px; margin-bottom: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05); border: 1px solid #eaedf0;
+    }
+    .news-time {
+        font-size: 12px; color: #6c757d; margin-bottom: 8px; font-weight: 600;
+    }
+    .news-text {
+        font-size: 15px; color: #212529; line-height: 1.5; margin-bottom: 12px;
+    }
+    .news-links {
+        font-size: 13px; border-top: 1px dashed #eaedf0; padding-top: 10px;
+    }
+    .news-links a { text-decoration: none; color: #0d6efd; }
+    .news-links a:hover { text-decoration: underline; }
 
-        /* --- MOBİL TABS (SABİT) --- */
-        .mobile-tabs {
-            display: none; 
-            background: var(--bg);
-            border-bottom: 1px solid var(--border);
-            position: absolute;
-            top: 60px; /* Header'ın bittiği yer */
-            left: 0;
-            right: 0;
-            height: 45px;
-            z-index: 90;
-            white-space: nowrap;
-        }
+    /* PWA Login Overlay */
+    .pwa-login {
+        position: fixed; top:0; left:0; right:0; bottom:0;
+        background: rgba(248, 249, 250, 0.95); backdrop-filter: blur(10px);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 2000;
+    }
+    .pwa-login .card {
+        width: 90%; max-width: 350px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+</style>
+{% endblock %}
 
-        /* MOBİL DÜZENLEMESİ */
-        @media (max-width: 800px) {
-            .mobile-tabs {
-                display: flex;
-                justify-content: space-around;
-                align-items: center;
-            }
-            .tab-btn {
-                flex: 1;
-                height: 100%;
-                background: none;
-                border: none;
-                color: var(--text-secondary);
-                font-weight: 600;
-                font-size: 14px;
-                cursor: pointer;
-                border-bottom: 3px solid transparent;
-                transition: color 0.3s, border-color 0.3s;
-            }
-            .tab-btn.active {
-                color: var(--text);
-                border-bottom-color: var(--primary);
-            }
-
-            /* Mobilde Main Container'ı Aşağı İt */
-            .main-container {
-                top: 105px; /* 60px Header + 45px Tabs */
-                display: flex; /* Grid yerine Flex */
-                overflow-x: auto; /* Yana kaydırma */
-                overflow-y: hidden; /* Dikey taşmayı engelle */
-                scroll-snap-type: x mandatory;
-                scroll-behavior: smooth;
-            }
-
-            .category-col {
-                min-width: 100vw; /* Her sütun tam ekran */
-                flex: 0 0 100vw;
-                height: 100%; /* Yüksekliği sabitle */
-                overflow: hidden;
-                display: flex; /* Flex geri geldi */
-                flex-direction: column;
-                scroll-snap-align: start;
-                border-right: none;
-                padding: 0; 
-            }
-            .feed-content {
-                padding: 15px; /* Mobile padding */
-            }
-            .col-header {
-                display: none; 
-            }
-        }
-
-        .time { 
-            font-size: 13px; 
-            color: var(--text-secondary); 
-            display: flex; 
-            align-items: center; 
-            gap: 5px; 
-            margin-bottom: 8px; 
-            font-weight: 400; 
-        }
-        .time svg { width: 14px; height: 14px; fill: currentColor; }
-        
-        .haber { font-size: 15px; line-height: 1.5; font-weight: 400; word-wrap: break-word; }
-        .kaynaklar { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-secondary); }
-        .kaynaklar b { color: var(--primary); display: block; margin-bottom: 6px; font-weight: 500; }
-        .kaynaklar a { color: var(--primary); text-decoration: none; }
-        .kaynaklar a:hover { text-decoration: underline; }
-        .kaynaklar ul { margin: 0; padding-left: 18px; list-style-type: disc; }
-        .kaynaklar li { margin-bottom: 4px; }
-    </style>
-</head>
-<body>
-
-    <!-- LOGIN OVERLAY -->
-    <div id="login-overlay" class="login-overlay">
-        <div class="login-box">
-            <img src="/static/ikon.png" style="width:50px; margin-bottom:15px; border-radius:8px;">
-            <h2 style="margin:0 0 20px 0; font-size:18px;">Kurumsal Giriş</h2>
-            <input type="text" id="username" placeholder="Kullanıcı Adı">
-            <input type="password" id="password" placeholder="Şifre">
-            <button onclick="login()">Giriş Yap</button>
-            <div id="login-error" class="error-msg">Hatalı kullanıcı adı veya şifre.</div>
-        </div>
+{% block content %}
+<!-- Login Overlay -->
+<div id="login-overlay" class="pwa-login">
+    <div class="card text-center">
+        <img src="/static/ikon.png" alt="Logo" width="60" class="mx-auto mb-3 rounded">
+        <h5 class="fw-bold mb-4">Çalışan Girişi</h5>
+        <input type="text" id="username" class="form-control mb-3" placeholder="Kullanıcı Adı">
+        <input type="password" id="password" class="form-control mb-3" placeholder="Şifre">
+        <button onclick="doLogin()" class="btn btn-primary w-100 fw-bold">Giriş Yap</button>
+        <div id="login-error" class="text-danger small mt-2 d-none"></div>
     </div>
+</div>
 
-    <div class="header">
-        <img src="/static/ikon.png" class="app-logo" alt="logo">
-        <h1 id="page-title">X Gündem Raporu</h1>
-        <button id="notify-btn" class="notify-btn" style="display:none;">Bildirimleri Aç</button>
-        
-        <!-- Tema Değiştirme Butonu -->
-        <button class="icon-btn" onclick="toggleTheme()" aria-label="Temayı Değiştir">
-            <svg id="theme-icon" viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37c-.39-.39-1.03-.39-1.41 0-.39.39-.39 1.03 0 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36c.39-.39.39-1.03 0-1.41-.39-.39-1.03-.39-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06z"/></svg>
-        </button>
-
-        <!-- Akışı Temizle Butonu (Çöp Kutusu İkonu) -->
-        <button class="icon-btn clear-btn" onclick="clearAll()" aria-label="Akışı Temizle">
-            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        </button>
-
-        <!-- Çıkış Yap Butonu -->
-        <button class="icon-btn" onclick="logout()" aria-label="Çıkış Yap" style="margin-left: 5px;">
-            <svg viewBox="0 0 24 24"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
+<!-- Üst Bar -->
+<div class="app-header">
+    <div class="d-flex align-items-center">
+        <img src="/static/ikon.png" alt="Logo" width="30" class="me-2 rounded">
+        <h6 class="mb-0 fw-bold">X Gündem Raporu</h6>
+    </div>
+    <div>
+        <button id="notify-btn" class="btn btn-sm btn-outline-primary fw-bold" style="display:none;" onclick="baslatBildirimSureci(false)">Bildirim Aç</button>
+        <button class="btn btn-sm btn-light border text-danger" onclick="logout()" title="Çıkış Yap">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/></svg>
         </button>
     </div>
+</div>
 
-    <!-- MOBİL İÇİN TAB MENU -->
-    <div class="mobile-tabs" id="mobile-tabs">
-        <button class="tab-btn active" onclick="scrollToCategory('Politika')">Politika</button>
-        <button class="tab-btn" onclick="scrollToCategory('Ekonomi')">Ekonomi</button>
-        <button class="tab-btn" onclick="scrollToCategory('Gündem')">Gündem</button>
-        <button class="tab-btn" onclick="scrollToCategory('Spor')">Spor</button>
+<!-- Mobil Sekmeler -->
+<div class="mobile-tabs" id="mobile-tabs">
+    <button class="active" onclick="scrollToCat('Politika')">Politika</button>
+    <button onclick="scrollToCat('Ekonomi')">Ekonomi</button>
+    <button onclick="scrollToCat('Gündem')">Gündem</button>
+    <button onclick="scrollToCat('Spor')">Spor</button>
+</div>
+
+<!-- Grid / Kaydırılabilir Alan -->
+<div class="pwa-container" id="pwa-container">
+    <div class="category-col" id="col-Politika">
+        <h6 class="d-none d-lg-block fw-bold text-center mb-3">Politika</h6>
+        <div class="feed-content" id="feed-Politika"></div>
     </div>
-
-    <!-- 4 Sütunlu Grid Container -->
-    <div class="main-container" id="main-container">
-        <!-- Politika -->
-        <div class="category-col" id="col-Politika">
-            <div class="col-header">Politika</div>
-            <div class="feed-content" id="feed-Politika"></div>
-        </div>
-        <!-- Ekonomi -->
-        <div class="category-col" id="col-Ekonomi">
-            <div class="col-header">Ekonomi</div>
-            <div class="feed-content" id="feed-Ekonomi"></div>
-        </div>
-        <!-- Gündem -->
-        <div class="category-col" id="col-Gündem">
-            <div class="col-header">Gündem</div>
-            <div class="feed-content" id="feed-Gündem"></div>
-        </div>
-        <!-- Spor -->
-        <div class="category-col" id="col-Spor">
-            <div class="col-header">Spor</div>
-            <div class="feed-content" id="feed-Spor"></div>
-        </div>
+    <div class="category-col" id="col-Ekonomi">
+        <h6 class="d-none d-lg-block fw-bold text-center mb-3">Ekonomi</h6>
+        <div class="feed-content" id="feed-Ekonomi"></div>
     </div>
+    <div class="category-col" id="col-Gündem">
+        <h6 class="d-none d-lg-block fw-bold text-center mb-3">Gündem</h6>
+        <div class="feed-content" id="feed-Gündem"></div>
+    </div>
+    <div class="category-col" id="col-Spor">
+        <h6 class="d-none d-lg-block fw-bold text-center mb-3">Spor</h6>
+        <div class="feed-content" id="feed-Spor"></div>
+    </div>
+</div>
+{% endblock %}
 
-    <script>
-        // --- TEMA YÖNETİMİ ---
-        (function() {
-            const savedTheme = localStorage.getItem('theme');
-            // Varsayılan olarak DARK (Kullanıcı seçimi yoksa)
-            if (!savedTheme || savedTheme === 'dark') {
-                document.documentElement.setAttribute('data-theme', 'dark');
-            } else {
-                document.documentElement.setAttribute('data-theme', 'light');
-            }
-        })();
+{% block scripts %}
+<script>
+    let currentUserUID = localStorage.getItem('tenant_id');
 
-        window.toggleTheme = function() {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-        }
-    </script>
+    // --- Lojik ---
+    async function doLogin() {
+        const user = document.getElementById('username').value;
+        const pass = document.getElementById('password').value;
+        const errDiv = document.getElementById('login-error');
 
-    <script>
-        let currentUserUID = localStorage.getItem('tenant_id');
+        try {
+            showLoading(); // Base.html'den gelen spinner
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
+            const data = await response.json();
+            document.getElementById('loadingOverlay').style.display = 'none';
 
-        // --- AUTH LOGIC ---
-        window.login = async function() {
-            const user = document.getElementById('username').value;
-            const pass = document.getElementById('password').value;
-            const errDiv = document.getElementById('login-error');
-            
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
-                const data = await response.json();
+            if (data.success) {
+                currentUserUID = data.tenant_id;
+                localStorage.setItem('tenant_id', currentUserUID);
+                document.getElementById('login-overlay').style.display = 'none';
 
-                if (data.success) {
-                    currentUserUID = data.tenant_id;
-                    localStorage.setItem('tenant_id', currentUserUID);
-                    document.getElementById('login-overlay').style.display = 'none';
-
-                    if (Notification.permission === 'granted') {
-                        baslatBildirimSureci(true);
-                    }
-                    loadFeed();
-                } else {
-                    errDiv.style.display = 'block';
-                    errDiv.innerText = data.message || "Hatalı giriş.";
+                if (Notification.permission === 'granted') {
+                    baslatBildirimSureci(true);
                 }
-            } catch (error) {
-                console.error(error);
-                errDiv.style.display = 'block';
-                errDiv.innerText = "Bağlantı hatası.";
+                loadFeed();
+            } else {
+                errDiv.classList.remove('d-none');
+                errDiv.innerText = data.message || "Hatalı giriş.";
             }
+        } catch (error) {
+            document.getElementById('loadingOverlay').style.display = 'none';
+            errDiv.classList.remove('d-none');
+            errDiv.innerText = "Bağlantı hatası.";
         }
+    }
 
-        window.logout = function() {
-            if(confirm("Çıkış yapmak istediğinize emin misiniz?")) {
+    function logout() {
+        Swal.fire({
+            title: "Çıkış Yap",
+            text: "Hesabınızdan çıkmak istediğinize emin misiniz?",
+            icon: "question",
+            showCancelButton: true,
+            confirmButtonText: "Evet, Çık",
+            cancelButtonText: "İptal"
+        }).then((result) => {
+            if (result.isConfirmed) {
                 localStorage.removeItem('tenant_id');
                 window.location.reload();
             }
-        }
-
-        if (currentUserUID) {
-            document.getElementById('login-overlay').style.display = 'none';
-        } else {
-            document.getElementById('login-overlay').style.display = 'flex';
-        }
-
-        // --- BİLDİRİM KAYDI (Native Web Push) ---
-        function urlBase64ToUint8Array(base64String) {
-            const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            const outputArray = new Uint8Array(rawData.length);
-            for (let i = 0; i < rawData.length; ++i) {
-                outputArray[i] = rawData.charCodeAt(i);
-            }
-            return outputArray;
-        }
-
-        async function baslatBildirimSureci(sessiz = false) {
-            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-                if (!sessiz) alert("Tarayıcınız bildirimleri desteklemiyor.");
-                return;
-            }
-
-            try {
-                const registration = await navigator.serviceWorker.register('/static/sw.js');
-                const permission = await Notification.requestPermission();
-                if (permission !== 'granted') {
-                    if (!sessiz) alert("Bildirim izni reddedildi.");
-                    return;
-                }
-
-                // Get VAPID key from backend
-                const vapidRes = await fetch('/api/vapid_public_key');
-                const vapidData = await vapidRes.json();
-                const applicationServerKey = urlBase64ToUint8Array(vapidData.public_key);
-
-                const subscription = await registration.pushManager.subscribe({
-                    userVisibleOnly: true,
-                    applicationServerKey: applicationServerKey
-                });
-
-                // Send subscription to backend
-                await fetch('/api/subscribe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        tenant_id: localStorage.getItem('tenant_id'),
-                        subscription: subscription.toJSON()
-                    })
-                });
-
-                document.getElementById('notify-btn').style.display = 'none';
-                if (!sessiz) alert("✅ Bildirimler başarıyla açıldı!");
-
-            } catch (err) {
-                console.error(err);
-                if (!sessiz) alert("Bildirim kaydı oluşturulamadı: " + err.message);
-            }
-        }
-
-        if ('Notification' in window) {
-            if (Notification.permission === 'default') {
-                const btn = document.getElementById('notify-btn');
-                btn.style.display = 'block';
-                btn.onclick = function() { baslatBildirimSureci(false); };
-            } else if (Notification.permission === 'granted') {
-                baslatBildirimSureci(true);
-            }
-        }
-
-        // Push Service Worker Listener for foreground (Optional, handled by SW mainly)
-        navigator.serviceWorker.addEventListener('message', event => {
-            // Can be used if SW sends a message to foreground client
         });
+    }
 
-        // --- AKIŞ ---
-        let currentItemIds = [];
-
-        window.clearAll = function() {
-            if(confirm("Tüm haberleri gizlemek istiyor musunuz?")) {
-                localStorage.setItem('hidden_news_ids', JSON.stringify(currentItemIds));
-                renderFeed({});
-            }
-        }
-
-        async function loadFeed() {
-            if (!currentUserUID) return;
-            
-            try {
-                const res = await fetch(`/api/feed?tenant_id=${currentUserUID}`);
-                const data = await res.json();
-                renderFeed(data);
-            } catch (e) { console.error(e); }
-        }
-
-        function renderFeed(data) {
-            const hiddenIds = JSON.parse(localStorage.getItem('hidden_news_ids') || "[]");
-            
-            // Tüm sütunları temizle
-            document.querySelectorAll('.feed-content').forEach(el => el.innerHTML = "");
-
-            if(!data || Object.keys(data).length === 0) {
-                // Her sütuna boş mesajı eklenebilir veya genel bir mesaj verilebilir
-                return;
-            }
-
-            currentItemIds = Object.keys(data);
-
-            currentItemIds.reverse().forEach(id => {
-                if (hiddenIds.includes(id)) return;
-                const item = data[id];
-                const kaynaklarHtml = item.kaynaklar ? `<div class="kaynaklar"><b>🔍 Kaynaklar</b><ul>${item.kaynaklar}</ul></div>` : "";
-                
-                // Kategori Belirleme
-                let kategori = item.kategori || "Gündem";
-                // Eski veriler veya hatalı kategoriler için güvenli liman: Gündem
-                if(!["Politika", "Ekonomi", "Spor", "Gündem"].includes(kategori)) {
-                    kategori = "Gündem";
-                }
-
-                const cardHtml = `
-                    <div class="card">
-                        <span class="time">
-                            <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
-                            ${item.zaman || ''} | ${item.tarih || ''}
-                        </span>
-                        <div class="haber">${item.haber}</div>
-                        ${kaynaklarHtml}
-                    </div>`;
-                
-                // İlgili sütuna ekle
-                const targetCol = document.getElementById(`feed-${kategori}`);
-                if(targetCol) {
-                    targetCol.innerHTML += cardHtml;
-                }
-            });
-        }
-
+    if (currentUserUID) {
+        document.getElementById('login-overlay').style.display = 'none';
         loadFeed();
-        setInterval(loadFeed, 25000);
+    }
 
-        // --- TABS & SCROLL LOGIC ---
-        window.scrollToCategory = function(catName) {
-            const target = document.getElementById('col-' + catName);
-            if(target) {
-                target.scrollIntoView({ behavior: 'smooth', inline: 'start' });
+    // --- BİLDİRİM (Native Web Push) ---
+    function urlBase64ToUint8Array(base64String) {
+        const padding = '='.repeat((4 - base64String.length % 4) % 4);
+        const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+        const rawData = window.atob(base64);
+        const outputArray = new Uint8Array(rawData.length);
+        for (let i = 0; i < rawData.length; ++i) {
+            outputArray[i] = rawData.charCodeAt(i);
+        }
+        return outputArray;
+    }
+
+    async function baslatBildirimSureci(sessiz = false) {
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            if (!sessiz) Swal.fire('Hata', 'Tarayıcınız bildirimleri desteklemiyor.', 'error');
+            return;
+        }
+
+        try {
+            const registration = await navigator.serviceWorker.register('/static/sw.js');
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') {
+                if (!sessiz) Swal.fire('Uyarı', 'Bildirim izni reddedildi.', 'warning');
+                return;
             }
-        };
 
-        // Scroll event to update active tab
-        const container = document.getElementById('main-container');
-        const tabs = document.querySelectorAll('.tab-btn');
+            const vapidRes = await fetch('/api/vapid_public_key');
+            const vapidData = await vapidRes.json();
+            const applicationServerKey = urlBase64ToUint8Array(vapidData.public_key);
 
-        container.addEventListener('scroll', () => {
-            // Find which column is most visible
-            let scrollLeft = container.scrollLeft;
-            let width = container.clientWidth;
-            let index = Math.round(scrollLeft / width);
-            
-            // Highlight corresponding tab
-            tabs.forEach((tab, i) => {
-                if (i === index) {
-                    tab.classList.add('active');
-                    // Scroll tab into view if needed
-                    tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                } else {
-                    tab.classList.remove('active');
-                }
+            const subscription = await registration.pushManager.subscribe({
+                userVisibleOnly: true,
+                applicationServerKey: applicationServerKey
             });
-        });
 
-    </script>
-</body>
-</html>
+            await fetch('/api/subscribe', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    tenant_id: localStorage.getItem('tenant_id'),
+                    subscription: subscription.toJSON()
+                })
+            });
+
+            document.getElementById('notify-btn').style.display = 'none';
+            if (!sessiz) Swal.fire('Harika', 'Bildirimler başarıyla açıldı!', 'success');
+
+        } catch (err) {
+            console.error(err);
+            if (!sessiz) Swal.fire('Hata', "Bildirim kaydı başarısız: " + err.message, 'error');
+        }
+    }
+
+    if ('Notification' in window) {
+        if (Notification.permission === 'default') {
+            document.getElementById('notify-btn').style.display = 'inline-block';
+        } else if (Notification.permission === 'granted') {
+            baslatBildirimSureci(true);
+        }
+    }
+
+    // --- HABER AKIŞI ---
+    async function loadFeed() {
+        if (!currentUserUID) return;
+        try {
+            const res = await fetch(`/api/feed?tenant_id=${currentUserUID}`);
+            const data = await res.json();
+            renderFeed(data);
+        } catch (e) { console.error(e); }
+    }
+
+    function renderFeed(data) {
+        document.querySelectorAll('.feed-content').forEach(el => el.innerHTML = "");
+        if(!data || Object.keys(data).length === 0) return;
+
+        let ids = Object.keys(data);
+        ids.reverse().forEach(id => {
+            const item = data[id];
+            let kategori = item.kategori || "Gündem";
+            if(!["Politika", "Ekonomi", "Spor", "Gündem"].includes(kategori)) kategori = "Gündem";
+
+            const kaynaklarHtml = item.kaynaklar ? `<div class="news-links text-muted mt-2">🔍 <b>Kaynaklar:</b><ul class="mb-0 ps-3 mt-1">${item.kaynaklar}</ul></div>` : "";
+
+            const html = `
+                <div class="news-card">
+                    <div class="news-time">🕒 ${item.zaman || ''} | ${item.tarih || ''}</div>
+                    <div class="news-text">${item.haber}</div>
+                    ${kaynaklarHtml}
+                </div>`;
+
+            const targetCol = document.getElementById(`feed-${kategori}`);
+            if(targetCol) targetCol.innerHTML += html;
+        });
+    }
+
+    setInterval(loadFeed, 25000);
+
+    // --- TAB/SCROLL MANTIĞI ---
+    function scrollToCat(cat) {
+        const target = document.getElementById('col-' + cat);
+        if(target) target.scrollIntoView({ behavior: 'smooth', inline: 'start' });
+    }
+
+    const container = document.getElementById('pwa-container');
+    const tabs = document.querySelectorAll('.mobile-tabs button');
+
+    container.addEventListener('scroll', () => {
+        let index = Math.round(container.scrollLeft / container.clientWidth);
+        tabs.forEach((tab, i) => {
+            if (i === index) {
+                tab.classList.add('active');
+                tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+    });
+</script>
+{% endblock %}
