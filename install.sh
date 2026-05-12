@@ -162,6 +162,8 @@ After=network.target
 User=$USER_NAME
 WorkingDirectory=$APP_DIR
 Environment="PATH=$APP_DIR/venv/bin"
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/$USER_NAME/.Xauthority"
 ExecStart=$APP_DIR/venv/bin/python app.py
 Restart=always
 
