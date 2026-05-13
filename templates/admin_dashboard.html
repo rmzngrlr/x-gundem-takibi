@@ -51,11 +51,45 @@
                                 </form>
                             </td>
                             <td>
-                                <form action="{{ url_for('admin_delete_tenant', tenant_id=t.tenant_id) }}" method="POST" class="d-inline" onsubmit="confirmAction(event, this, 'Kurumu Sil', 'Bu kurumu ve ona ait tüm verileri silmek istediğinize emin misiniz?')">
-                                    <button type="submit" class="btn btn-sm btn-danger">Sil 🗑️</button>
-                                </form>
+                                <div class="d-flex gap-1">
+                                    <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editTenantModal{{ loop.index }}">Düzenle ✏️</button>
+                                    <form action="{{ url_for('admin_delete_tenant', tenant_id=t.tenant_id) }}" method="POST" class="d-inline" onsubmit="confirmAction(event, this, 'Kurumu Sil', 'Bu kurumu ve ona ait tüm verileri silmek istediğinize emin misiniz?')">
+                                        <button type="submit" class="btn btn-sm btn-danger">Sil 🗑️</button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
+
+                        <!-- Kurum Düzenle Modal -->
+                        <div class="modal fade" id="editTenantModal{{ loop.index }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold">Kurum Bilgilerini Düzenle</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                                    </div>
+                                    <form action="{{ url_for('admin_edit_tenant', old_tenant_id=t.tenant_id) }}" method="POST" onsubmit="showLoading()">
+                                        <div class="modal-body">
+                                            <div class="mb-3">
+                                                <label class="form-label text-muted small">Kurum Adı</label>
+                                                <input type="text" name="tenant_id" class="form-control" value="{{ t.tenant_id }}" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label class="form-label text-muted small">Yeni Şifre <small>(Değişmeyecekse boş bırakın)</small></label>
+                                                <input type="text" name="password" class="form-control">
+                                            </div>
+                                            <div class="alert alert-warning small">
+                                                <b>Not:</b> Kurum adını değiştirirseniz, kurum yöneticisi yeni adla giriş yapmak zorundadır. Eski adla kayıtlı personeller, tarama ayarları ve haber akışı otomatik olarak yeni isme taşınacaktır.
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                                            <button type="submit" class="btn btn-primary fw-bold">Değişiklikleri Kaydet</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                         {% else %}
                         <tr>
                             <td colspan="4" class="text-center text-muted py-4">Henüz kayıtlı kurum bulunmamaktadır.</td>
