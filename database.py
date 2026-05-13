@@ -116,10 +116,21 @@ def init_db():
             )
         ''')
 
+        # Mevcut tablolara yeni eklenen kolonları kontrol et ve ekle
+        try:
+            cursor.execute("SELECT is_scanning FROM tarama_ayarlari LIMIT 1")
+            cursor.fetchall()
+        except mysql.connector.Error as err:
+            if err.errno == 1054: # Unknown column
+                cursor.execute("ALTER TABLE tarama_ayarlari ADD COLUMN is_scanning BOOLEAN DEFAULT FALSE")
+                print("`is_scanning` kolonu `tarama_ayarlari` tablosuna eklendi.")
+            else:
+                print(f"Kolon kontrolünde hata: {err}")
+
         conn.commit()
         cursor.close()
         conn.close()
-        print("Tablolar başarıyla oluşturuldu.")
+        print("Tablolar başarıyla oluşturuldu (veya güncellendi).")
 
 if __name__ == "__main__":
     init_db()
