@@ -98,6 +98,7 @@ def init_db():
                 hedef_veri TEXT,
                 ai_aktif BOOLEAN DEFAULT TRUE,
                 dakika INT DEFAULT 1,
+                is_scanning BOOLEAN DEFAULT FALSE,
                 FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
             )
         ''')

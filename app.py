@@ -85,6 +85,42 @@ def api_subscribe():
 
     return jsonify({'success': True})
 
+@app.route('/kurumsal/delete_news', methods=['POST'])
+def kurumsal_delete_news():
+    if not is_tenant(): return jsonify({'success': False}), 403
+    data = request.json
+    news_ids = data.get('ids', [])
+    tenant_id = session.get('tenant_id')
+
+    if not news_ids or not tenant_id:
+         return jsonify({'success': False}), 400
+
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        format_strings = ','.join(['%s'] * len(news_ids))
+        query = f"DELETE FROM haberler WHERE id IN ({format_strings}) AND tenant_id=%s"
+        params = tuple(news_ids) + (tenant_id,)
+        cursor.execute(query, params)
+        conn.commit()
+        cursor.close()
+        conn.close()
+    return jsonify({'success': True})
+
+@app.route('/kurumsal/delete_all_news', methods=['POST'])
+def kurumsal_delete_all_news():
+    if not is_tenant(): return jsonify({'success': False}), 403
+    tenant_id = session.get('tenant_id')
+
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM haberler WHERE tenant_id=%s", (tenant_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+    return jsonify({'success': True})
+
 @app.route('/api/feed', methods=['GET'])
 def api_feed():
     tenant_id = request.args.get('tenant_id')
@@ -154,6 +190,52 @@ def admin():
 
     return render_template('admin_dashboard.html', tenants=tenants)
 
+@app.route('/admin/edit_tenant/<old_tenant_id>', methods=['POST'])
+def admin_edit_tenant(old_tenant_id):
+    if not is_super_admin(): return redirect(url_for('admin'))
+
+    new_tenant_id = request.form.get('tenant_id')
+    new_password = request.form.get('password')
+
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        try:
+            # CASCADE ayarlı olduğu için tenants tablosunda PK değiştiğinde
+            # calisanlar, haberler, tarama_ayarlari ve push_subscriptions
+            # tablolarındaki FK (tenant_id) de otomatik olarak güncellenmelidir.
+            # Ancak veritabanı kurulum scriptimizde `ON UPDATE CASCADE` eklemeyi unuttuysak,
+            # güvenli olması için foreign_key_checks i kapatıp manuel güncelleyeceğiz.
+
+            cursor.execute("SET FOREIGN_KEY_CHECKS=0;")
+
+            if new_tenant_id and new_tenant_id != old_tenant_id:
+                # Önce bu ismin kullanımda olup olmadığına bak
+                cursor.execute("SELECT id FROM tenants WHERE tenant_id=%s", (new_tenant_id,))
+                if not cursor.fetchone():
+                    cursor.execute("UPDATE tenants SET tenant_id=%s WHERE tenant_id=%s", (new_tenant_id, old_tenant_id))
+                    cursor.execute("UPDATE calisanlar SET tenant_id=%s WHERE tenant_id=%s", (new_tenant_id, old_tenant_id))
+                    cursor.execute("UPDATE haberler SET tenant_id=%s WHERE tenant_id=%s", (new_tenant_id, old_tenant_id))
+                    cursor.execute("UPDATE tarama_ayarlari SET tenant_id=%s WHERE tenant_id=%s", (new_tenant_id, old_tenant_id))
+                    cursor.execute("UPDATE push_subscriptions SET tenant_id=%s WHERE tenant_id=%s", (new_tenant_id, old_tenant_id))
+                    target_tenant_id = new_tenant_id
+                else:
+                    target_tenant_id = old_tenant_id # İsim kullanımda, sadece şifre değişecek
+            else:
+                target_tenant_id = old_tenant_id
+
+            if new_password:
+                cursor.execute("UPDATE tenants SET password_hash=%s WHERE tenant_id=%s", (hash_password(new_password), target_tenant_id))
+
+            cursor.execute("SET FOREIGN_KEY_CHECKS=1;")
+            conn.commit()
+        except Exception as e:
+            print("Düzenleme Hatası:", e)
+        finally:
+            cursor.close()
+            conn.close()
+    return redirect(url_for('admin'))
+
 @app.route('/admin/add_tenant', methods=['POST'])
 def admin_add_tenant():
     if not is_super_admin(): return redirect(url_for('admin'))
@@ -202,6 +284,31 @@ from scraper import TwitterScraperThread
 
 # Uygulama çapında çalışan threadleri tutmak için
 app.scraper_threads = {}
+
+def resume_active_scrapers():
+    """Uygulama başladığında, veritabanında is_scanning=1 olan tenantlar için threadleri ayağa kaldırır."""
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute("SELECT tenant_id FROM tarama_ayarlari WHERE is_scanning = TRUE")
+            active_tenants = cursor.fetchall()
+            for t in active_tenants:
+                tid = t['tenant_id']
+                if tid not in app.scraper_threads or not app.scraper_threads[tid].running:
+                    print(f"[Auto-Resume] {tid} kurumunun taraması arka planda yeniden başlatılıyor...")
+                    thread = TwitterScraperThread(tid)
+                    app.scraper_threads[tid] = thread
+                    thread.start()
+        except Exception as e:
+            print("Auto-Resume Hatası:", e)
+        finally:
+            cursor.close()
+            conn.close()
+
+# Flask auto-resume tetikleyici
+with app.app_context():
+    resume_active_scrapers()
 
 # --- KURUMSAL PANEL ---
 @app.route('/kurumsal', methods=['GET', 'POST'])
@@ -262,15 +369,35 @@ def kurumsal_start_stop():
     tenant_id = session.get('tenant_id')
     action = request.form.get('action')
 
+    conn = get_db_connection()
+
     if action == 'start':
         if tenant_id not in app.scraper_threads or not app.scraper_threads[tenant_id].running:
             thread = TwitterScraperThread(tenant_id)
             app.scraper_threads[tenant_id] = thread
             thread.start()
+
+            # DB Güncelleme
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE tarama_ayarlari SET is_scanning=TRUE WHERE tenant_id=%s", (tenant_id,))
+                conn.commit()
+                cursor.close()
+
     elif action == 'stop':
         if tenant_id in app.scraper_threads:
             app.scraper_threads[tenant_id].stop()
             del app.scraper_threads[tenant_id]
+
+            # DB Güncelleme
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE tarama_ayarlari SET is_scanning=FALSE WHERE tenant_id=%s", (tenant_id,))
+                conn.commit()
+                cursor.close()
+
+    if conn:
+        conn.close()
 
     return redirect(url_for('kurumsal'))
 
@@ -292,6 +419,28 @@ def kurumsal_add_employee():
                  pass
             cursor.close()
             conn.close()
+    return redirect(url_for('kurumsal'))
+
+@app.route('/kurumsal/edit_employee/<employee_id>', methods=['POST'])
+def kurumsal_edit_employee(employee_id):
+    if not is_tenant(): return redirect(url_for('kurumsal'))
+
+    new_username = request.form.get('username')
+    new_password = request.form.get('password')
+
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor(dictionary=True)
+        # Sadece bu kuruma ait olduğundan emin ol
+        cursor.execute("SELECT id FROM calisanlar WHERE id=%s AND tenant_id=%s", (employee_id, session.get('tenant_id')))
+        if cursor.fetchone():
+            if new_password: # Şifre de değişecek
+                cursor.execute("UPDATE calisanlar SET username=%s, password=%s WHERE id=%s", (new_username, new_password, employee_id))
+            else: # Sadece kullanıcı adı değişecek
+                cursor.execute("UPDATE calisanlar SET username=%s WHERE id=%s", (new_username, employee_id))
+            conn.commit()
+        cursor.close()
+        conn.close()
     return redirect(url_for('kurumsal'))
 
 @app.route('/kurumsal/delete_employee/<employee_id>', methods=['POST'])
