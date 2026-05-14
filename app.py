@@ -139,6 +139,7 @@ def api_feed():
         rows = cursor.fetchall()
         for row in rows:
             feed_data[str(row['id'])] = {
+                'id': row['id'],
                 'zaman': row['zaman'],
                 'tarih': row['tarih'],
                 'haber': row['haber'],
