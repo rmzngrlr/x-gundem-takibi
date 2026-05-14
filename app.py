@@ -3,10 +3,13 @@ import os
 import time
 import threading
 from dotenv import load_dotenv
-from database import get_db_connection, hash_password
+from database import get_db_connection, hash_password, init_db
 import math
 
 load_dotenv()
+
+# Veritabanını ve eksik kolonları (örneğin is_scanning) otomatik oluştur/güncelle
+init_db()
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev_secret")
