@@ -18,6 +18,8 @@ init_db()
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev_secret")
+# Çerez çakışmalarını önlemek için (Aynı IP'de farklı Flask appleri çalışırken)
+app.config['SESSION_COOKIE_NAME'] = 'xgundem_session'
 
 # --- YARDIMCI FONKSİYONLAR ---
 def is_super_admin():
