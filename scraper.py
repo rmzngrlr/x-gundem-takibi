@@ -53,7 +53,7 @@ class TwitterScraperThread(threading.Thread):
 
     def get_settings(self):
         conn = get_db_connection()
-        settings = {'tarama_tipi': 'Kullanıcı Listesi', 'hedef_veri': '', 'ai_aktif': True, 'dakika': 1}
+        settings = {'tarama_tipi': 'Kullanıcı Listesi', 'hedef_veri': '', 'ai_aktif': True}
         if conn:
             cursor = conn.cursor(dictionary=True)
             cursor.execute("SELECT * FROM tarama_ayarlari WHERE tenant_id=%s", (self.tenant_id,))
