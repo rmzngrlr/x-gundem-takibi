@@ -348,87 +348,106 @@ class TwitterScraperThread(threading.Thread):
             return
 
         while self.running:
-            settings = self.get_settings()
-            if not self.oturum_kontrol():
-                current_time = time.time()
-                # 5 dakikada bir uyar, surekli spam atma
-                if current_time - self._last_login_warning_time > 300:
-                    print(f"[{self.tenant_id}] Lütfen X oturumu açın (tarayıcı penceresinden giriş yapınız).")
-                    self._last_login_warning_time = current_time
-                time.sleep(15)
-                continue
-            else:
-                self._last_login_warning_time = 0
+            try:
+                settings = self.get_settings()
+                if not self.oturum_kontrol():
+                    current_time = time.time()
+                    # 5 dakikada bir uyar, surekli spam atma
+                    if current_time - self._last_login_warning_time > 300:
+                        print(f"[{self.tenant_id}] Lütfen X oturumu açın (tarayıcı penceresinden giriş yapınız).")
+                        self._last_login_warning_time = current_time
+                    time.sleep(15)
+                    continue
+                else:
+                    self._last_login_warning_time = 0
 
-            toplanan = []
-            if settings.get('tarama_tipi') == "Kullanıcı Listesi":
-                accs = [x.strip() for x in settings.get('hedef_veri', '').split(",") if x.strip()]
-                for acc in accs:
+                toplanan = []
+                if settings.get('tarama_tipi') == "Kullanıcı Listesi":
+                    accs = [x.strip() for x in settings.get('hedef_veri', '').split(",") if x.strip()]
+                    for acc in accs:
+                        if not self.running: break
+                        self.driver.get(f"https://x.com/{acc}")
+                        time.sleep(3)
+                        toplanan.extend(self.tweet_yakala(limit=10))
+                else:
+                    url = settings.get('hedef_veri', '')
+                    if url:
+                        self.driver.get(url)
+                        time.sleep(4)
+                        toplanan.extend(self.tweet_yakala(limit=25))
+
+                # Buffer update
+                for t in toplanan:
+                    if not any(b['link'] == t['link'] for b in self.tweet_buffer):
+                        t['timestamp'] = time.time()
+                        self.tweet_buffer.append(t)
+
+                simdiki_zaman = time.time()
+                self.tweet_buffer = [t for t in self.tweet_buffer if (simdiki_zaman - t.get('timestamp', 0)) < 1200][-500:]
+
+                # Semantic Analysis
+                gruplar = self.semantik_analiz(self.tweet_buffer)
+                if gruplar:
+                    for grup in gruplar:
+                        grup_linkleri = set(t['link'] for t in grup)
+                        cakisma = len(grup_linkleri.intersection(self.raporlanan_linkler))
+                        if cakisma > 0 and (cakisma / len(grup_linkleri)) > 0.5:
+                            continue
+
+                        if any(t['link'] not in self.gordugum_linkler for t in grup):
+                            ozet = grup[0]['metin']
+                            kat = "Gündem"
+                            if settings.get('ai_aktif'):
+                                ozet, kat = self.haber_metni_olustur_groq(grup)
+
+                            # Duplicate check
+                            def temizle(metin):
+                                words = re.sub(r'[^\w\s]', '', metin.lower()).split()
+                                return set([w[:5] for w in words])
+
+                            s1_clean = temizle(ozet)
+                            zaten_var = False
+                            for r in self.raporlanan_ozetler:
+                                s2_clean = temizle(r)
+                                if s1_clean and s2_clean:
+                                    jaccard = len(s1_clean & s2_clean) / len(s1_clean | s2_clean)
+                                    if jaccard > 0.4: zaten_var = True; break
+                                if SequenceMatcher(None, ozet, r).ratio() > 0.6:
+                                    zaten_var = True; break
+
+                            if not zaten_var:
+                                links = "".join([f"<li><small>@{t['hesap']}: {t['metin'][:80]}... <a href='{t['link']}' target='_blank'>Git</a></small></li>" for t in grup])
+                                self.save_and_notify(ozet, links, kat)
+
+                                for t in grup:
+                                    self.gordugum_linkler.add(t['link'])
+                                    self.raporlanan_linkler.add(t['link'])
+                                self.raporlanan_ozetler.append(ozet)
+
+                # Wait cycle
+                saat = datetime.now().hour
+                bekleme = random.randint(60, 90) if 0 <= saat < 6 else random.randint(35, 65)
+                # Sleep in chunks to allow interruption
+                for _ in range(bekleme):
                     if not self.running: break
-                    self.driver.get(f"https://x.com/{acc}")
-                    time.sleep(3)
-                    toplanan.extend(self.tweet_yakala(limit=10))
-            else:
-                url = settings.get('hedef_veri', '')
-                if url:
-                    self.driver.get(url)
-                    time.sleep(4)
-                    toplanan.extend(self.tweet_yakala(limit=25))
+                    time.sleep(1)
 
-            # Buffer update
-            for t in toplanan:
-                if not any(b['link'] == t['link'] for b in self.tweet_buffer):
-                    t['timestamp'] = time.time()
-                    self.tweet_buffer.append(t)
+            except Exception as e:
+                print(f"[{self.tenant_id}] Tarayıcı çöktü veya kapandı. Hata: {e}", flush=True)
+                print(f"[{self.tenant_id}] Tarayıcı yeniden başlatılıyor (Auto-Recovery)...", flush=True)
+                # Kırık driver'i temizle
+                if self.driver:
+                    try:
+                        self.driver.quit()
+                    except:
+                        pass
+                    self.driver = None
 
-            simdiki_zaman = time.time()
-            self.tweet_buffer = [t for t in self.tweet_buffer if (simdiki_zaman - t.get('timestamp', 0)) < 1200][-500:]
-
-            # Semantic Analysis
-            gruplar = self.semantik_analiz(self.tweet_buffer)
-            if gruplar:
-                for grup in gruplar:
-                    grup_linkleri = set(t['link'] for t in grup)
-                    cakisma = len(grup_linkleri.intersection(self.raporlanan_linkler))
-                    if cakisma > 0 and (cakisma / len(grup_linkleri)) > 0.5:
-                        continue
-
-                    if any(t['link'] not in self.gordugum_linkler for t in grup):
-                        ozet = grup[0]['metin']
-                        kat = "Gündem"
-                        if settings.get('ai_aktif'):
-                            ozet, kat = self.haber_metni_olustur_groq(grup)
-
-                        # Duplicate check
-                        def temizle(metin):
-                            words = re.sub(r'[^\w\s]', '', metin.lower()).split()
-                            return set([w[:5] for w in words])
-
-                        s1_clean = temizle(ozet)
-                        zaten_var = False
-                        for r in self.raporlanan_ozetler:
-                            s2_clean = temizle(r)
-                            if s1_clean and s2_clean:
-                                jaccard = len(s1_clean & s2_clean) / len(s1_clean | s2_clean)
-                                if jaccard > 0.4: zaten_var = True; break
-                            if SequenceMatcher(None, ozet, r).ratio() > 0.6:
-                                zaten_var = True; break
-
-                        if not zaten_var:
-                            links = "".join([f"<li><small>@{t['hesap']}: {t['metin'][:80]}... <a href='{t['link']}' target='_blank'>Git</a></small></li>" for t in grup])
-                            self.save_and_notify(ozet, links, kat)
-
-                            for t in grup:
-                                self.gordugum_linkler.add(t['link'])
-                                self.raporlanan_linkler.add(t['link'])
-                            self.raporlanan_ozetler.append(ozet)
-
-            # Wait cycle
-            saat = datetime.now().hour
-            bekleme = random.randint(60, 90) if 0 <= saat < 6 else random.randint(35, 65)
-            # Sleep in chunks to allow interruption
-            for _ in range(bekleme):
-                if not self.running: break
-                time.sleep(1)
+                # Biraz dinlenip yeniden başlat
+                time.sleep(5)
+                self.start_browser()
+                if not self.driver:
+                    print(f"[{self.tenant_id}] Auto-Recovery basarisiz oldu. Driver baslatilamadi.", flush=True)
+                    self.running = False
 
         self.stop()
