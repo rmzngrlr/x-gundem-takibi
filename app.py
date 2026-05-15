@@ -294,30 +294,46 @@ from scraper import TwitterScraperThread
 # Uygulama çapında çalışan threadleri tutmak için
 app.scraper_threads = {}
 
-def resume_active_scrapers():
-    """Uygulama başladığında, veritabanında is_scanning=1 olan tenantlar için threadleri ayağa kaldırır."""
+def reset_all_scrapers():
+    """Uygulama başladığında, tüm kurumların tarama durumunu durduruldu (is_scanning=0) olarak günceller."""
     conn = get_db_connection()
     if conn:
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()
         try:
-            cursor.execute("SELECT tenant_id FROM tarama_ayarlari WHERE is_scanning = TRUE")
-            active_tenants = cursor.fetchall()
-            for t in active_tenants:
-                tid = t['tenant_id']
-                if tid not in app.scraper_threads or not app.scraper_threads[tid].running:
-                    print(f"[Auto-Resume] {tid} kurumunun taraması arka planda yeniden başlatılıyor...")
-                    thread = TwitterScraperThread(tid)
-                    app.scraper_threads[tid] = thread
-                    thread.start()
+            cursor.execute("UPDATE tarama_ayarlari SET is_scanning = FALSE")
+            conn.commit()
+            print("[Init] Uygulama basliyor, tum tarama islemleri varsayilan olarak durduruldu.")
         except Exception as e:
-            print("Auto-Resume Hatası:", e)
+            print("Reset Scrapers Hatası:", e)
         finally:
             cursor.close()
             conn.close()
 
-# Flask auto-resume tetikleyici
+# Uygulama başlarken botları otomatik başlatma, durumlarını sıfırla
 with app.app_context():
-    resume_active_scrapers()
+    reset_all_scrapers()
+
+@app.route('/api/status', methods=['GET'])
+def api_status():
+    tenant_id = request.args.get('tenant_id')
+    if not tenant_id:
+        return jsonify({})
+
+    is_running = False
+    next_scan_in = 0
+
+    if tenant_id in app.scraper_threads:
+        thread = app.scraper_threads[tenant_id]
+        if thread.is_alive() and thread.running:
+            is_running = True
+            diff = int(thread.next_scan_time - time.time())
+            if diff > 0:
+                next_scan_in = diff
+
+    return jsonify({
+        'is_running': is_running,
+        'next_scan_in': next_scan_in
+    })
 
 # --- KURUMSAL PANEL ---
 @app.route('/kurumsal', methods=['GET', 'POST'])

@@ -7,12 +7,17 @@
     <!-- Sol Menü: Ayarlar & Başlat/Durdur -->
     <div class="col-lg-4 mb-4">
         <!-- Başlat / Durdur Kartı -->
-        <div class="card p-4 text-center border-{{ 'danger' if is_running else 'primary' }}">
+        <div class="card p-4 text-center border-{{ 'danger' if is_running else 'primary' }}" id="status-card">
             <h5 class="fw-bold mb-3">Tarama Durumu</h5>
             {% if is_running %}
-                <div class="mb-3 text-danger fw-bold d-flex justify-content-center align-items-center">
-                    <div class="spinner-grow spinner-grow-sm me-2" role="status"></div>
-                    Sistem Çalışıyor
+                <div class="mb-3 text-danger fw-bold d-flex flex-column justify-content-center align-items-center">
+                    <div class="d-flex align-items-center mb-1">
+                        <div class="spinner-grow spinner-grow-sm me-2" role="status"></div>
+                        Sistem Çalışıyor
+                    </div>
+                    <div id="countdown-timer" class="text-muted small fw-normal" style="min-height: 20px;">
+                        <!-- Countdown will appear here -->
+                    </div>
                 </div>
                 <form action="{{ url_for('kurumsal_start_stop') }}" method="POST" onsubmit="showLoading()">
                     <button type="submit" name="action" value="stop" class="btn btn-danger w-100 fw-bold btn-lg">⏹️ DURDUR</button>
@@ -236,7 +241,7 @@
                     <input class="form-check-input news-checkbox" type="checkbox" value="${item.id}">
                 </td>
                 <td class="date-col text-muted small">
-                    <div class="fw-bold text-dark">${item.zaman || ''}</div>
+                    <div class="fw-bold text-body">${item.zaman || ''}</div>
                     ${item.tarih || ''}
                 </td>
                 <td><span class="badge bg-${badgeColor}">${cat}</span></td>
@@ -331,8 +336,31 @@
         renderTable(kat);
     }
 
+    async function fetchStatus() {
+        try {
+            const res = await fetch(`/api/status?tenant_id=${tenantId}`);
+            const data = await res.json();
+            const timerEl = document.getElementById('countdown-timer');
+            if (timerEl && data.is_running) {
+                if (data.next_scan_in > 0) {
+                    timerEl.innerText = `Sıradaki tarama: ~${data.next_scan_in} sn`;
+                } else {
+                    timerEl.innerText = 'Tarama yapılıyor...';
+                }
+            }
+        } catch (e) {
+            console.error("Status check error:", e);
+        }
+    }
+
     // İlk yükleme ve 15 saniyede bir otomatik güncelleme
     fetchNews();
     setInterval(fetchNews, 15000);
+
+    // Check status more frequently for countdown
+    {% if is_running %}
+    fetchStatus();
+    setInterval(fetchStatus, 3000);
+    {% endif %}
 </script>
 {% endblock %}

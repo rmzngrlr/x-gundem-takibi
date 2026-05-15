@@ -39,6 +39,7 @@ class TwitterScraperThread(threading.Thread):
         self.raporlanan_linkler = set()
         self.raporlanan_ozetler = []
         self._last_login_warning_time = 0
+        self.next_scan_time = 0
 
         # Load historical sumaries for dup checking
         conn = get_db_connection()
@@ -427,6 +428,7 @@ class TwitterScraperThread(threading.Thread):
                 # Wait cycle
                 saat = datetime.now().hour
                 bekleme = random.randint(60, 90) if 0 <= saat < 6 else random.randint(35, 65)
+                self.next_scan_time = time.time() + bekleme
                 # Sleep in chunks to allow interruption
                 for _ in range(bekleme):
                     if not self.running: break
