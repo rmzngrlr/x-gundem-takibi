@@ -372,7 +372,7 @@ def kurumsal():
         employees = cursor.fetchall()
 
         cursor.execute("SELECT * FROM tarama_ayarlari WHERE tenant_id=%s", (tenant_id,))
-        settings = cursor.fetchone() or {'tarama_tipi': 'Kullanıcı Listesi', 'hedef_veri': '', 'ai_aktif': True, 'dakika': 1}
+        settings = cursor.fetchone() or {'tarama_tipi': 'Kullanıcı Listesi', 'hedef_veri': '', 'ai_aktif': True}
 
         cursor.close()
         conn.close()
@@ -489,16 +489,15 @@ def kurumsal_save_settings():
     tarama_tipi = request.form.get('tarama_tipi')
     hedef_veri = request.form.get('hedef_veri')
     ai_aktif = 'ai_aktif' in request.form
-    dakika = request.form.get('dakika', 1)
 
     conn = get_db_connection()
     if conn:
         cursor = conn.cursor()
         cursor.execute("""
-            INSERT INTO tarama_ayarlari (tenant_id, tarama_tipi, hedef_veri, ai_aktif, dakika)
-            VALUES (%s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE tarama_tipi=%s, hedef_veri=%s, ai_aktif=%s, dakika=%s
-        """, (tenant_id, tarama_tipi, hedef_veri, ai_aktif, dakika, tarama_tipi, hedef_veri, ai_aktif, dakika))
+            INSERT INTO tarama_ayarlari (tenant_id, tarama_tipi, hedef_veri, ai_aktif)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE tarama_tipi=%s, hedef_veri=%s, ai_aktif=%s
+        """, (tenant_id, tarama_tipi, hedef_veri, ai_aktif, tarama_tipi, hedef_veri, ai_aktif))
         conn.commit()
         cursor.close()
         conn.close()
