@@ -155,7 +155,7 @@ class TwitterScraperThread(threading.Thread):
         metin = re.sub(r'^[A-ZİĞÜŞÖÇ\s]+\s*[|]\s*', '', metin)
         return metin
 
-    def tweet_yakala(self, limit=1):
+    def tweet_yakala(self, limit=50):
         veriler = []
         try:
             try:
@@ -165,28 +165,54 @@ class TwitterScraperThread(threading.Thread):
                 )
             except: return []
 
-            for _ in range(3):
-                self.driver.execute_script("window.scrollBy(0, 1000);")
+            bulunan_linkler = set()
+            eski_sayaci = 0
+            # Smart scrolling: En fazla 15 kez kaydır. Eğer peş peşe 3 kaydırmada hep eski (gördüğümüz) linkleri görürsek dur.
+            for scroll_tur in range(15):
+                articles = self.driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="cellInnerDiv"]')
+                if not articles: articles = self.driver.find_elements(By.TAG_NAME, "article")
+
+                yeni_bulundu = False
+                for article in articles:
+                    if len(veriler) >= limit: break
+                    try:
+                        try:
+                            time_element = article.find_element(By.TAG_NAME, "time")
+                            lnk = time_element.find_element(By.XPATH, "..").get_attribute("href")
+                        except: lnk = "link_yok"
+
+                        if lnk in bulunan_linkler:
+                            continue
+
+                        bulunan_linkler.add(lnk)
+
+                        if lnk != "link_yok" and lnk not in self.gordugum_linkler:
+                            yeni_bulundu = True
+
+                        tweet_text = article.find_element(By.CSS_SELECTOR, 'div[data-testid="tweetText"]').text
+                        own = lnk.split("/")[3] if "/" in lnk and len(lnk.split("/")) > 3 else "bilinmeyen"
+
+                        if not self.cop_tweet_kontrol(tweet_text):
+                            veriler.append({"hesap": own, "metin": tweet_text, "link": lnk})
+                    except: continue
+
+                if len(veriler) >= limit: break
+
+                if not yeni_bulundu:
+                    eski_sayaci += 1
+                else:
+                    eski_sayaci = 0
+
+                # Eğer peş peşe 3 kaydırmada hiç yeni link bulamadıysa, geçmişe ulaşmışız demektir, çıkabiliriz.
+                if eski_sayaci >= 3:
+                    break
+
+                self.driver.execute_script("window.scrollBy(0, 1500);")
                 time.sleep(random.uniform(1.5, 2.5))
 
-            articles = self.driver.find_elements(By.CSS_SELECTOR, 'div[data-testid="cellInnerDiv"]')
-            if not articles: articles = self.driver.find_elements(By.TAG_NAME, "article")
+        except Exception as e:
+            pass
 
-            for article in articles:
-                if len(veriler) >= limit: break
-                try:
-                    tweet_text = article.find_element(By.CSS_SELECTOR, 'div[data-testid="tweetText"]').text
-                    try:
-                        time_element = article.find_element(By.TAG_NAME, "time")
-                        lnk = time_element.find_element(By.XPATH, "..").get_attribute("href")
-                    except: lnk = "link_yok"
-
-                    own = lnk.split("/")[3] if "/" in lnk and len(lnk.split("/")) > 3 else "bilinmeyen"
-
-                    if not self.cop_tweet_kontrol(tweet_text):
-                        veriler.append({"hesap": own, "metin": tweet_text, "link": lnk})
-                except: continue
-        except: pass
         return veriler
 
     def haber_metni_olustur_groq(self, grup):
@@ -356,7 +382,7 @@ class TwitterScraperThread(threading.Thread):
                     self.tweet_buffer.append(t)
 
             simdiki_zaman = time.time()
-            self.tweet_buffer = [t for t in self.tweet_buffer if (simdiki_zaman - t.get('timestamp', 0)) < 1200][-150:]
+            self.tweet_buffer = [t for t in self.tweet_buffer if (simdiki_zaman - t.get('timestamp', 0)) < 1200][-500:]
 
             # Semantic Analysis
             gruplar = self.semantik_analiz(self.tweet_buffer)
