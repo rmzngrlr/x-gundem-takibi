@@ -336,17 +336,28 @@
         renderTable(kat);
     }
 
+    let currentCountdown = 0;
+    let countdownInterval = null;
+
+    function updateTimerUI() {
+        const timerEl = document.getElementById('countdown-timer');
+        if (!timerEl) return;
+
+        if (currentCountdown > 0) {
+            timerEl.innerText = `Sıradaki tarama: ~${currentCountdown} sn`;
+            currentCountdown--;
+        } else {
+            timerEl.innerText = 'Tarama yapılıyor...';
+        }
+    }
+
     async function fetchStatus() {
         try {
             const res = await fetch(`/api/status?tenant_id=${tenantId}`);
             const data = await res.json();
-            const timerEl = document.getElementById('countdown-timer');
-            if (timerEl && data.is_running) {
-                if (data.next_scan_in > 0) {
-                    timerEl.innerText = `Sıradaki tarama: ~${data.next_scan_in} sn`;
-                } else {
-                    timerEl.innerText = 'Tarama yapılıyor...';
-                }
+            if (data.is_running) {
+                currentCountdown = data.next_scan_in;
+                updateTimerUI(); // API'den gelen en taze veriyle ekrani hemen guncelle
             }
         } catch (e) {
             console.error("Status check error:", e);
@@ -360,7 +371,8 @@
     // Check status more frequently for countdown
     {% if is_running %}
     fetchStatus();
-    setInterval(fetchStatus, 3000);
+    setInterval(fetchStatus, 5000); // Sunucuyla her 5sn'de bir senkronize ol
+    countdownInterval = setInterval(updateTimerUI, 1000); // Ekranda saniye saniye akıt
     {% endif %}
 </script>
 {% endblock %}
