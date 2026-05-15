@@ -38,6 +38,7 @@ class TwitterScraperThread(threading.Thread):
         self.gordugum_linkler = set()
         self.raporlanan_linkler = set()
         self.raporlanan_ozetler = []
+        self._last_login_warning_time = 0
 
         # Load historical sumaries for dup checking
         conn = get_db_connection()
@@ -323,9 +324,15 @@ class TwitterScraperThread(threading.Thread):
         while self.running:
             settings = self.get_settings()
             if not self.oturum_kontrol():
-                print(f"[{self.tenant_id}] Lütfen X oturumu açın.")
+                current_time = time.time()
+                # 5 dakikada bir uyar, surekli spam atma
+                if current_time - self._last_login_warning_time > 300:
+                    print(f"[{self.tenant_id}] Lütfen X oturumu açın (tarayıcı penceresinden giriş yapınız).")
+                    self._last_login_warning_time = current_time
                 time.sleep(15)
                 continue
+            else:
+                self._last_login_warning_time = 0
 
             toplanan = []
             if settings.get('tarama_tipi') == "Kullanıcı Listesi":
