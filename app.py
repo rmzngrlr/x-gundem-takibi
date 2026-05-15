@@ -2,11 +2,16 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import os
 import time
 import threading
+import logging
 from dotenv import load_dotenv
 from database import get_db_connection, hash_password, init_db
 import math
 
 load_dotenv()
+
+# Werkzeug (Flask) access loglarını kapat. Sadece hata olursa göster.
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
 
 # Veritabanını ve eksik kolonları (örneğin is_scanning) otomatik oluştur/güncelle
 init_db()
