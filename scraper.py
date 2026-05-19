@@ -5,6 +5,7 @@ import re
 import json
 import sys
 import threading
+import socket
 from datetime import datetime
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -70,10 +71,23 @@ class TwitterScraperThread(threading.Thread):
             except: pass
             self.driver = None
 
+    def get_free_port(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', 0))
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            return s.getsockname()[1]
+
     def start_browser(self):
         ensure_selenium_imports()
         profile_path = os.path.join(os.getcwd(), f"chrome_profile_{self.tenant_id}")
         if not os.path.exists(profile_path): os.makedirs(profile_path)
+
+        # Chrome İzolasyonu İçin Temp Klasörü Ayarlama
+        temp_dir = os.path.join(os.getcwd(), f"chrome_temp_{self.tenant_id}")
+        if not os.path.exists(temp_dir): os.makedirs(temp_dir)
+
+        # Port İzolasyonu (CDP çakışmasını engeller)
+        free_port = self.get_free_port()
 
         options = uc.ChromeOptions()
         options.add_argument("--start-maximized")
@@ -84,6 +98,9 @@ class TwitterScraperThread(threading.Thread):
         options.add_argument("--disable-infobars")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument(f"--remote-debugging-port={free_port}")
+        options.add_argument(f"--crash-dumps-dir={temp_dir}")
+        options.add_argument(f"--disk-cache-dir={temp_dir}")
 
         # Kullanıcının fiziksel Chrome görmesi istendiği için headless kaldırıldı
         # Ancak X11/Wayland çökmelerini engellemek için DISPLAY ayarı yapılır
