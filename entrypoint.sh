@@ -13,7 +13,7 @@ fluxbox &
 sleep 1
 
 echo "VNC Sunucusu başlatılıyor (Port 5900)..."
-x11vnc -display $DISPLAY -forever -usepw -shared -rfbport 5900 &
+x11vnc -display $DISPLAY -forever -usepw -shared -rfbport 5900 -listen 0.0.0.0 &
 sleep 2
 
 echo "Python uygulaması başlatılıyor..."
