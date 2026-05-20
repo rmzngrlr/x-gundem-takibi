@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  xgundem_app:
+    build: .
+    container_name: xgundem_container
+    restart: unless-stopped
+    # Host network modunu kullanıyoruz çünkü:
+    # 1. Programınız ana sunucudaki (host) 3306 portunda çalışan MySQL'e bağlanmak zorunda.
+    # 2. X Gündem'in Flask arayüzüne 3010'dan doğrudan erişilebilmeli.
+    # 3. VNC izleme portu 5900 doğrudan erişilebilir olmalı.
+    network_mode: "host"
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Localhost yerine 127.0.0.1 kullanımı MySQL bağlantısı için bazen daha güvenilirdir.
+      - DB_HOST=127.0.0.1
+      - DB_PORT=3306
+    volumes:
+      # Veritabanı ve profil kalıcılığı için temp klasörlerini host'ta tutabiliriz
+      # (Opsiyonel ama chrome profillerinin kaybolmaması için iyi olabilir)
+      - ./.env:/app/.env
